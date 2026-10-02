@@ -4,7 +4,7 @@ import './globals.css';
 import AuthGate from '@/components/AuthGate';
 
 export const metadata: Metadata = {
-  title: 'Quillix',
+  title: 'Ques-AI',
   description: 'AI Assessment Creator',
 };
 
