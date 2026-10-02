@@ -49,7 +49,7 @@ export default function AssignmentsPage() {
         <Topbar breadcrumb="Assignment">
           <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, fontWeight:500 }}>
             <span style={{ width:7, height:7, borderRadius:'50%', background:backendOnline?'#22C55E':'#EF4444', display:'inline-block', boxShadow:backendOnline?'0 0 0 2px #BBF7D0':'0 0 0 2px #FECACA', transition:'all 0.3s' }} />
-            <span style={{ color:backendOnline?'#15803D':'#DC2626' }}>{backendOnline?'Live':'Offline'}</span>
+            <span style={{ color:backendOnline?'#15803D':'#DC2626' }}>{backendOnline?'Server reachable':'Server offline'}</span>
           </div>
         </Topbar>
 

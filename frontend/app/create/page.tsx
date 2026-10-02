@@ -56,7 +56,9 @@ export default function CreatePage() {
   const readPdfText = async (file:File) => {
     // pdf.js is loaded in the browser from a pinned CDN version (no server cost, no extra dependency to bundle).
     const base = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.149/build/';
-    const pdfjs: any = await import(/* webpackIgnore: true */ base + 'pdf.min.mjs');
+    let pdfjs: any;
+    try { pdfjs = await import(/* webpackIgnore: true */ base + 'pdf.min.mjs'); }
+    catch { throw new Error('PDF_LOADER'); }
     pdfjs.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.mjs';
     const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
     let out = '';
@@ -77,7 +79,11 @@ export default function CreatePage() {
         const text = await readPdfText(file);
         if(text.length<20){ toast.error('This PDF has no selectable text (scanned PDFs are not supported)'); return; }
         setFileName(file.name); setFileContent(text);
-      } catch { toast.error('Could not read this PDF'); }
+      } catch(err:unknown) {
+        toast.error(err instanceof Error && err.message==='PDF_LOADER'
+          ? 'The PDF reader could not be loaded (it needs access to cdn.jsdelivr.net). Check your connection or use a .txt file.'
+          : 'This PDF could not be read (it may be damaged or password-protected). Try another file or a .txt file.');
+      }
       return;
     }
     setFileName(file.name);

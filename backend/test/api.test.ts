@@ -81,6 +81,7 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
       const bad = await j('/', { method: 'POST', body: JSON.stringify({ title: 't', subject: 's', dueDate: '2026-10-20', questionTypes: ['x'], numberOfQuestions: 3, totalMarks: 9, questionPlan: P.questionPlan }) });
       ok(bad.status === 400, 'route rejects a plan that does not add up');
     }
+    assert.throws(() => parseResponse(good.replace('Q1?', 'What is the main function of mitochondria?').replace('Q2?', 'What is the main function of the mitochondria?'), A), /near duplicates/); n++;
     assert.throws(() => parseResponse(good, { ...A, numberOfQuestions: 3 }), /expected 3/); n++;
     assert.throws(() => parseResponse(good.replace('"Short"', '"Long"'), A), /not requested/); n++;
     assert.throws(() => parseResponse(good.replace('"answer":"b"', '"answer":"z"'), A), /not one of its options/); n++;
