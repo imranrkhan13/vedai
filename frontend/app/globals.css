@@ -223,9 +223,10 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 
 @media (max-width: 520px) {
-  .topbar { overflow-x: auto; gap: 6px; padding-right: 8px; }
+  .topbar { flex-wrap: wrap; height: auto; min-height: 54px; padding-top: 8px; padding-bottom: 8px; padding-right: 12px; gap: 6px; }
+  .topbar span { white-space: nowrap; }
   .topbar .btn-sm { padding-left: 9px; padding-right: 9px; font-size: 12px; gap: 4px; flex-shrink: 0; }
-  .topbar > div { gap: 4px !important; }
+  .topbar > div { gap: 4px !important; flex-wrap: wrap; }
   .topbar .btn-sm svg { display: none; }
   .main-content [style*="48px"] { padding-left: 16px !important; padding-right: 16px !important; }
   .main-content [style*="48px"] input { width: auto !important; flex: 1; min-width: 0; }
