@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { auth } from '@/lib/api';
+import { api, auth } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, User, Settings, BookOpen, LogOut, HelpCircle, Bell, Star } from 'lucide-react';
 
@@ -19,7 +19,7 @@ export default function AccountMenu() {
 
   const items: { icon: any; label: string; action: () => void; highlight?: boolean; danger?: boolean }[] = [
     { icon: BookOpen,   label: 'My Assignments',     action: () => { router.push('/assignments'); setOpen(false); } },
-    { icon: LogOut,     label: 'Sign out',           danger: true, action: () => { auth.clear(); window.location.href = '/login'; } },
+    { icon: LogOut,     label: 'Sign out',           danger: true, action: () => { api.logout().catch(() => {}).finally(() => { auth.clear(); window.location.href = '/login'; }); } },
   ];
 
   return (
