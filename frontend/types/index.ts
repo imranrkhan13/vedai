@@ -51,6 +51,7 @@ export interface CreateAssignmentInput {
   subject: string;
   dueDate: string;
   questionTypes: string[];
+  questionPlan?: { type: string; qty: number; marks: number }[];
   numberOfQuestions: number;
   totalMarks: number;
   difficulty: 'easy' | 'medium' | 'hard' | 'mixed';
