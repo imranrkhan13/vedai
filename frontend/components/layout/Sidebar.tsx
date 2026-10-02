@@ -84,7 +84,7 @@ export default function Sidebar() {
 
       {/* Mobile hamburger */}
       <button className="mobile-menu" onClick={() => setOpen(true)}
-        style={{ display: 'none', position: 'fixed', top: 13, left: 14, zIndex: 200, background: '#fff', border: '1px solid #EBEBEB', borderRadius: 8, padding: 7, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', alignItems: 'center', justifyContent: 'center' }}>
+        style={{ display: 'none', visibility: open ? 'hidden' : 'visible', position: 'fixed', top: 13, left: 14, zIndex: 200, background: '#fff', border: '1px solid #EBEBEB', borderRadius: 8, padding: 7, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', alignItems: 'center', justifyContent: 'center' }}>
         <Menu size={17} color="#1A1A1A" />
       </button>
 
