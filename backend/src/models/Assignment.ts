@@ -1,5 +1,15 @@
 import { getDb } from '../services/db';
 
+// Postgres text/JSONB cannot store NUL (0x00); MongoDB could. PDFs/uploads often contain it.
+export function stripNul<T>(v: T): T {
+  if (typeof v === 'string') return v.replace(/\u0000/g, '') as unknown as T;
+  if (Array.isArray(v)) return v.map(stripNul) as unknown as T;
+  if (v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) {
+    return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [stripNul(k), stripNul(x)])) as T;
+  }
+  return v;
+}
+
 export interface IQuestion {
   id: string;
   text: string;
@@ -89,7 +99,8 @@ function rowToAssignment(r: any, withHeavy = true): IAssignment {
 }
 
 export const Assignment = {
-  async create(input: NewAssignment): Promise<IAssignment> {
+  async create(rawInput: NewAssignment): Promise<IAssignment> {
+    const input = stripNul(rawInput);
     const { rows } = await getDb().query(
       `INSERT INTO vedai_assignments (title, subject, due_date, question_types, number_of_questions, total_marks,
          difficulty, additional_instructions, file_content, client_id)
@@ -125,13 +136,13 @@ export const Assignment = {
   async setCompleted(id: string, output: IGeneratedOutput) {
     await getDb().query(
       "UPDATE vedai_assignments SET status='completed', output=$2::jsonb, error=NULL, updated_at=now() WHERE id=$1",
-      [id, JSON.stringify(output)]
+      [id, JSON.stringify(stripNul(output))]
     );
   },
 
   async setFailed(id: string, error: string) {
     if (!UUID_RE.test(id)) return;
-    await getDb().query("UPDATE vedai_assignments SET status='failed', error=$2, updated_at=now() WHERE id=$1", [id, error]);
+    await getDb().query("UPDATE vedai_assignments SET status='failed', error=$2, updated_at=now() WHERE id=$1", [id, stripNul(error)]);
   },
 
   async resetForRegenerate(id: string) {
