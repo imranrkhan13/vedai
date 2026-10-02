@@ -1,4 +1,4 @@
-import { IAssignment, IGeneratedOutput, ISection, IQuestion } from '../models/Assignment';
+import { stripNul, IAssignment, IGeneratedOutput, ISection, IQuestion } from '../models/Assignment';
 import { v4 as uuidv4 } from 'uuid';
 
 // ── Prompt builder ────────────────────────────────────────────────────────────
@@ -20,7 +20,9 @@ RULES:
 - Total marks across ALL sections must equal exactly ${a.totalMarks}
 - Total questions across ALL sections must equal exactly ${a.numberOfQuestions}
 - Questions must be specific, academically rigorous, and about ${a.subject}
-- Each question must have: text, difficulty (easy|medium|hard), marks (number), type (string)
+- Each question must have: text, difficulty (easy|medium|hard), marks (number), type (string), answer (the correct answer or a short model answer)
+- Every MCQ question MUST also have an "options" array of exactly 4 distinct answer choices (plain text, no A/B/C/D prefixes), and its "answer" must be exactly one of those options
+- Use only the requested question types
 - Group into logical sections: Section A = short/MCQ (1-2 marks), Section B = medium (3-5 marks), Section C = long (5-10 marks)
 
 JSON schema:
@@ -35,7 +37,7 @@ JSON schema:
       "instruction": "Attempt all questions. Each question carries N marks.",
       "totalMarks": number,
       "questions": [
-        { "text": "Full question text here", "difficulty": "easy", "marks": 1, "type": "MCQ" }
+        { "text": "Full question text here", "difficulty": "easy", "marks": 1, "type": "MCQ", "options": ["choice 1", "choice 2", "choice 3", "choice 4"], "answer": "choice 2" }
       ]
     }
   ]
@@ -182,17 +184,25 @@ async function callWithFallback(prompt: string): Promise<string | null> {
 }
 
 // ── Parse LLM response ──────────────────────────────────────────────────────
-function parseResponse(raw: string, a: IAssignment): IGeneratedOutput {
+export function parseResponse(raw: string, a: IAssignment): IGeneratedOutput {
   const cleaned = raw.replace(/```json\n?|```\n?/g, '').trim();
   const parsed = JSON.parse(cleaned);
   const sections: ISection[] = (parsed.sections || []).map((sec: any) => {
-    const questions: IQuestion[] = (sec.questions || []).map((q: any) => ({
-      id: uuidv4(), text: q.text || '', difficulty: q.difficulty || 'medium',
-      marks: Number(q.marks) || 1, type: q.type || 'short',
-    }));
+    const questions: IQuestion[] = (sec.questions || []).map((q: any) => {
+      const type = String(q.type || 'short');
+      const text = stripNul(String(q.text || '')).trim();
+      if (!text) throw new Error('Model returned a question with no text');
+      const out: IQuestion = { id: uuidv4(), text, difficulty: ['easy', 'medium', 'hard'].includes(q.difficulty) ? q.difficulty : 'medium', marks: Number(q.marks) || 1, type };
+      if (Array.isArray(q.options)) out.options = q.options.map((o: any) => stripNul(String(o)).trim()).filter(Boolean);
+      if (q.answer !== undefined && q.answer !== null && String(q.answer).trim()) out.answer = stripNul(String(q.answer)).trim();
+      if (/mcq|multiple/i.test(type) && (!out.options || out.options.length < 2)) throw new Error('Model returned an MCQ without answer choices');
+      return out;
+    });
     return { title: sec.title || 'Section', instruction: sec.instruction || 'Attempt all questions.', questions, totalMarks: questions.reduce((s, q) => s + q.marks, 0) };
   });
-  return { subject: parsed.subject || a.subject, totalMarks: parsed.totalMarks || a.totalMarks, duration: parsed.duration || '2 hours', grade: parsed.grade || '', sections, generatedAt: new Date() };
+  const total = sections.reduce((n, sec) => n + sec.questions.length, 0);
+  if (total !== a.numberOfQuestions) throw new Error(`Model returned ${total} questions, expected ${a.numberOfQuestions}`);
+  return { subject: parsed.subject || a.subject, totalMarks: sections.reduce((n, sec) => n + sec.totalMarks, 0), duration: parsed.duration || '2 hours', grade: parsed.grade || '', sections, generatedAt: new Date() };
 }
 
 // ── High-quality subject-aware mock ─────────────────────────────────────────
@@ -418,11 +428,13 @@ export async function generateQuestionPaper(a: IAssignment): Promise<IGeneratedO
   const prompt = buildPrompt(a);
   const raw = await callWithFallback(prompt);
 
+  let rejected = '';
   if (raw) {
     try {
       return parseResponse(raw, a);
     } catch (parseErr) {
-      console.warn('[AI] Parse failed, using mock:', parseErr);
+      rejected = parseErr instanceof Error ? parseErr.message : String(parseErr);
+      console.warn('[AI] Generated paper rejected:', rejected);
     }
   }
 
@@ -433,5 +445,5 @@ export async function generateQuestionPaper(a: IAssignment): Promise<IGeneratedO
     const mock = buildMockOutput(a);
     return { ...mock, schoolName: 'SAMPLE PAPER (not AI-generated)' };
   }
-  throw new Error('All AI providers failed or are not configured');
+  throw new Error(rejected ? `Generated paper rejected: ${rejected}` : 'All AI providers failed or are not configured');
 }
