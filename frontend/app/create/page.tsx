@@ -54,6 +54,7 @@ export default function CreatePage() {
     setQRows(r=>r.map((row,idx)=>idx===i?{...row,[key]:val}:row));
 
   const readFile = (file:File) => {
+    if(!/\.txt$/i.test(file.name)){ toast.error('Only .txt files are supported right now (PDF and image reading is not available)'); return; }
     if(file.size>10*1024*1024){ toast.error('Max 10MB'); return; }
     setFileName(file.name);
     const reader = new FileReader();
@@ -115,7 +116,7 @@ export default function CreatePage() {
             <h2 style={{ fontSize:14, fontWeight:600, marginBottom:3, color:'var(--black)' }}>Assignment Details</h2>
             <p style={{ fontSize:12, color:'var(--gray-400)', marginBottom:18 }}>Basic information about your assignment</p>
 
-            <input ref={fileRef} type="file" accept=".txt,.pdf,.png,.jpg,.jpeg" style={{ display:'none' }} onChange={e=>e.target.files?.[0]&&readFile(e.target.files[0])}/>
+            <input ref={fileRef} type="file" accept=".txt,text/plain" style={{ display:'none' }} onChange={e=>e.target.files?.[0]&&readFile(e.target.files[0])}/>
             {!fileName?(
               <div onClick={()=>fileRef.current?.click()}
                 onDragOver={e=>{e.preventDefault();setDragOver(true);}}
@@ -126,7 +127,7 @@ export default function CreatePage() {
                   <Upload size={16} color="#9CA3AF"/>
                 </div>
                 <p style={{ fontSize:13, color:'var(--gray-500)', marginBottom:4 }}>Choose a file or drag &amp; drop it here</p>
-                <p style={{ fontSize:11, color:'var(--gray-400)', marginBottom:12 }}>JPEG, PNG, PDF, TXT up to 10MB</p>
+                <p style={{ fontSize:11, color:'var(--gray-400)', marginBottom:12 }}>TXT files only, up to 10MB</p>
                 <button className="btn btn-ghost btn-sm" type="button" onClick={e=>{e.stopPropagation();fileRef.current?.click();}}>Browse Files</button>
               </div>
             ):(
