@@ -45,6 +45,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ clientId }),
     }),
+  saveRubric: (id: string, questionId: string, levels: { marks: number; descriptor: string; example: string }[]) =>
+    fetchAPI(`/assignments/${id}/rubric`, { method: 'PATCH', body: JSON.stringify({ questionId, levels }) }),
   deleteAssignment: (id: string) =>
     fetchAPI(`/assignments/${id}`, { method: 'DELETE' }),
 };
