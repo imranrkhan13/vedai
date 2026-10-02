@@ -225,7 +225,7 @@ function validatePaper(sections: ISection[], a: IAssignment): void {
 export function parseResponse(raw: string, a: IAssignment): IGeneratedOutput {
   const cleaned = raw.replace(/```json\n?|```\n?/g, '').trim();
   const parsed = JSON.parse(cleaned);
-  const sections: ISection[] = (parsed.sections || []).map((sec: any) => {
+  const sections: ISection[] = (parsed.sections || []).filter((sec: any) => Array.isArray(sec?.questions) && sec.questions.length > 0).map((sec: any) => {
     const questions: IQuestion[] = (sec.questions || []).map((q: any) => {
       const type = String(q.type || 'short');
       const text = stripNul(String(q.text || '')).trim();
