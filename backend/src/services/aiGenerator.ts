@@ -88,7 +88,7 @@ async function tryOpenRouter(prompt: string): Promise<string> {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'HTTP-Referer': 'https://vedaai.app', 'X-Title': 'VedaAI' },
-      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 4096, temperature: 0.4 }),
+      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 8192, temperature: 0.4 }),
     });
     if (!res.ok) {
       const body = redactError(await res.text().catch(() => ''), key);
@@ -100,7 +100,7 @@ async function tryOpenRouter(prompt: string): Promise<string> {
     const data = await res.json() as any;
     const text = data?.choices?.[0]?.message?.content;
     if (text) return text;
-    lastErr = `OpenRouter ${model}: empty`;
+    lastErr = `OpenRouter ${model}: empty (finish_reason ${data?.choices?.[0]?.finish_reason ?? 'none'})`;
     console.warn(`[AI] ${lastErr}`);
   }
   throw new Error(lastErr);
@@ -225,7 +225,7 @@ function validatePaper(sections: ISection[], a: IAssignment): void {
 export function parseResponse(raw: string, a: IAssignment): IGeneratedOutput {
   const cleaned = raw.replace(/```json\n?|```\n?/g, '').trim();
   const parsed = JSON.parse(cleaned);
-  const sections: ISection[] = (parsed.sections || []).map((sec: any) => {
+  const sections: ISection[] = (parsed.sections || []).filter((sec: any) => Array.isArray(sec?.questions) && sec.questions.length > 0).map((sec: any) => {
     const questions: IQuestion[] = (sec.questions || []).map((q: any) => {
       const type = String(q.type || 'short');
       const text = stripNul(String(q.text || '')).trim();

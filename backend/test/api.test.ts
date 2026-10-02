@@ -71,6 +71,7 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
     const good = JSON.stringify({ sections: [{ title: 'A', questions: [{ text: 'Q1?', marks: 2, type: 'MCQ', difficulty: 'easy', options: ['a', 'b', 'c', 'd'], answer: 'b' }, { text: 'Q2?', marks: 2, type: 'Short', difficulty: 'easy', answer: 'x' }] }] });
     const g = parseResponse(good, A);
     ok(g.sections[0].questions[0].options?.length === 4 && g.sections[0].questions[0].answer === 'b' && g.totalMarks === 4, 'parse keeps MCQ options, answer, real marks total');
+    ok(parseResponse(good.replace('}]}]}', '}]},{"title":"C","questions":[]}]}'), A).sections.length === 1, 'empty sections are dropped');
     assert.throws(() => parseResponse(good.replace('"options":["a","b","c","d"],', ''), A), /MCQ without answer choices/); n++;
     assert.throws(() => parseResponse(good, { ...A, numberOfQuestions: 3 }), /expected 3/); n++;
     assert.throws(() => parseResponse(good.replace('"Short"', '"Long"'), A), /not requested/); n++;
