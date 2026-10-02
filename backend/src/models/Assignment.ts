@@ -40,12 +40,15 @@ export interface IGeneratedOutput {
 export type AssignmentStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 // API shape is unchanged from the MongoDB version (frontend reads `_id`).
+export interface QuestionPlanRow { type: string; qty: number; marks: number }
+
 export interface IAssignment {
   _id: string;
   title: string;
   subject: string;
   dueDate: Date;
   questionTypes: string[];
+  questionPlan?: QuestionPlanRow[];
   numberOfQuestions: number;
   totalMarks: number;
   difficulty: 'easy' | 'medium' | 'hard' | 'mixed';
@@ -65,6 +68,7 @@ export interface NewAssignment {
   subject: string;
   dueDate: Date;
   questionTypes: string[];
+  questionPlan?: QuestionPlanRow[];
   numberOfQuestions: number;
   totalMarks: number;
   difficulty: 'easy' | 'medium' | 'hard' | 'mixed';
@@ -89,6 +93,7 @@ function rowToAssignment(r: any, withHeavy = true): IAssignment {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
+  if (r.question_plan != null) a.questionPlan = r.question_plan;
   if (r.additional_instructions != null) a.additionalInstructions = r.additional_instructions;
   if (r.job_id != null) a.jobId = r.job_id;
   if (r.client_id != null) a.clientId = r.client_id;
@@ -105,10 +110,10 @@ export const Assignment = {
     const input = stripNul(rawInput);
     const { rows } = await getDb().query(
       `INSERT INTO vedai_assignments (title, subject, due_date, question_types, number_of_questions, total_marks,
-         difficulty, additional_instructions, file_content, client_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+         difficulty, additional_instructions, file_content, client_id, question_plan)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [input.title, input.subject, input.dueDate, input.questionTypes, input.numberOfQuestions, input.totalMarks,
-       input.difficulty, input.additionalInstructions ?? null, input.fileContent ?? null, input.clientId ?? null]
+       input.difficulty, input.additionalInstructions ?? null, input.fileContent ?? null, input.clientId ?? null, input.questionPlan ? JSON.stringify(input.questionPlan) : null]
     );
     return rowToAssignment(rows[0]);
   },
