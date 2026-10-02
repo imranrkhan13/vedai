@@ -64,10 +64,11 @@ function GradingDemo({ a, onChanged }:{ a:any; onChanged:()=>void }){
   if(qs.length===0) return null;
   const id = a._id||a.id;
   const run = async (q:Question)=>{
-    const t = (ans[q.id]||'').trim();
-    if(!t.startsWith('SYNTHETIC TEST')||t.length<20){ toast.error('Demo mode: type an answer that starts with SYNTHETIC TEST (at least 20 characters).'); return; }
+    const f = ans[q.id]||'full';
+    let overwrite = false;
+    if(q.grade&&q.grade.edited){ if(!window.confirm('You already saved your own marks here. Grade again? Your earlier result is kept in history, but the draft is replaced.')) return; overwrite = true; }
     setBusy(q.id);
-    try { await api.gradeAnswer(id, q.id, t); toast.success('Draft marks ready for your review'); onChanged(); }
+    try { await api.gradeAnswer(id, q.id, f, overwrite); toast.success('Draft marks ready for your review'); onChanged(); }
     catch(err:unknown){ toast.error(err instanceof Error?err.message:'Could not grade'); }
     finally { setBusy(''); }
   };
@@ -82,11 +83,11 @@ function GradingDemo({ a, onChanged }:{ a:any; onChanged:()=>void }){
   return (
     <div className="card fade-up" style={{ padding:'16px 20px', marginTop:14, maxWidth:760 }}>
       <h3 style={{ fontSize:14, fontWeight:700, color:'var(--black)', marginBottom:4 }}>Grading demo (synthetic answers only)</h3>
-      <p style={{ fontSize:11, color:'var(--gray-500)', lineHeight:1.5, marginBottom:12 }}>Demo only. Type a made-up answer that starts with SYNTHETIC TEST. Do not paste real student work. The text is sent to TypeSafe&apos;s Jev model, which picks the marking level that fits best. The draft marks and the confidence are the model&apos;s, they are not proof the marks are right. The confidence shows how sure the model is, not whether it is correct. You decide the final marks. Limited number of gradings per paper and per day.</p>
+      <p style={{ fontSize:11, color:'var(--gray-500)', lineHeight:1.5, marginBottom:12 }}>Demo only, limited to one approved demo account. You pick one of three built-in made-up answers; you cannot type or upload your own. The built-in answer is sent to TypeSafe&apos;s Jev model, which picks the marking level that fits best. The draft marks and the confidence are the model&apos;s, they are not proof the marks are right. The confidence shows how sure the model is, not whether it is correct. You decide the final marks. Limited number of gradings per paper and per day.</p>
       {qs.map((q,qi)=>{ const g=q.grade; return (
         <div key={q.id} style={{ borderTop:qi?'1px solid var(--border)':'none', paddingTop:qi?12:0, marginTop:qi?12:0 }}>
           <p style={{ fontSize:13, fontWeight:600, color:'var(--black)', marginBottom:6 }}>{q.text} <span style={{ color:'var(--gray-500)', fontWeight:500 }}>[max {q.marks}]</span></p>
-          <textarea className="input" value={ans[q.id]??''} onChange={e=>setAns(x=>({...x,[q.id]:e.target.value}))} placeholder="SYNTHETIC TEST answer..." style={{ minHeight:110, fontSize:12, width:'100%' }} aria-label="Synthetic test answer"/>
+          <select className="input" value={ans[q.id]??'full'} onChange={e=>setAns(x=>({...x,[q.id]:e.target.value}))} style={{ height:34, fontSize:12, width:'100%' }} aria-label="Built-in synthetic answer"><option value="full">Built-in answer 1 (complete)</option><option value="partial">Built-in answer 2 (partial)</option><option value="weak">Built-in answer 3 (weak)</option></select>
           <button className="btn btn-orange" onClick={()=>run(q)} disabled={busy===q.id} style={{ fontSize:12, marginTop:6 }}>{busy===q.id?'Working...':(g?'Grade again':'Get draft marks')}</button>
           {g&&(
             <div style={{ marginTop:10, fontSize:12, color:'var(--gray-500)', lineHeight:1.6 }}>
