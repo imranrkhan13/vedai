@@ -25,7 +25,10 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
 
   const app = express(); app.use(express.json()); app.use('/api/assignments', router);
   const srv = app.listen(0); const base = `http://127.0.0.1:${(srv.address() as AddressInfo).port}/api/assignments`;
-  const j = async (u: string, o?: RequestInit) => { const r = await fetch(base + u, { headers: { 'Content-Type': 'application/json' }, ...o }); return { status: r.status, body: await r.json() as any }; };
+  const { signToken, verifyToken, hashPassword, verifyPassword } = await import('../src/services/auth');
+  const T1 = signToken('user-1'), T2 = signToken('user-2');
+  let tok = T1;
+  const j = async (u: string, o?: RequestInit) => { const r = await fetch(base + u, { headers: { 'Content-Type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) }, ...o }); return { status: r.status, body: await r.json() as any }; };
   let n = 0; const ok = (c: unknown, m: string) => { assert.ok(c, m); n++; };
 
   const body = { title: 'Unit test', subject: 'Science', dueDate: '2026-10-15', questionTypes: ['MCQ', 'Short'], numberOfQuestions: 6, totalMarks: 30, difficulty: 'mixed', clientId: 'c1' };
@@ -55,6 +58,22 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
 
   r = await j(''); ok(r.body.data.length === 1 && r.body.data[0]._id === id && r.body.data[0].output === undefined, 'list shape, no output');
 
+  // auth and per-owner isolation
+  tok = '';
+  r = await j(''); ok(r.status === 401, 'list without token is 401');
+  r = await j('/' + id); ok(r.status === 401, 'get without token is 401');
+  r = await j('/' + id, { method: 'DELETE' }); ok(r.status === 401, 'delete without token is 401');
+  r = await j(`/${id}/regenerate`, { method: 'POST', body: '{}' }); ok(r.status === 401, 'regenerate without token is 401');
+  tok = T1.slice(0, -2) + 'xx'; r = await j(''); ok(r.status === 401, 'tampered token is 401');
+  tok = signToken('user-1', -10); r = await j(''); ok(r.status === 401, 'expired token is 401');
+  tok = T2;
+  r = await j(''); ok(r.status === 200 && r.body.data.length === 0, 'other user sees an empty list');
+  r = await j('/' + id); ok(r.status === 404, 'other user cannot read it, even though it is cached');
+  r = await j(`/${id}/regenerate`, { method: 'POST', body: '{}' }); ok(r.status === 404, 'other user cannot regenerate');
+  r = await j('/' + id, { method: 'DELETE' }); ok(r.status === 404, 'other user cannot delete');
+  ok(verifyToken(T1) === 'user-1' && verifyToken('a.b') === null, 'token verify');
+  ok(verifyPassword('correct horse', hashPassword('correct horse')) && !verifyPassword('wrong', hashPassword('correct horse')), 'password hashing');
+  tok = T1;
   r = await j(`/${id}/regenerate`, { method: 'POST', body: JSON.stringify({ clientId: 'c1' }) });
   ok(r.status === 200 && jobs.length === 2 && !cache.has('assignment:' + id), 'regenerate queues job, clears cache');
   r = await j('/' + id); ok(r.body.data.status === 'pending' && r.body.data.output === undefined && r.body.data.jobId === '2', 'regenerate reset state');
@@ -95,5 +114,18 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
   const L = [{ name: 'Groq' }, { name: 'Gemini' }, { name: 'Cohere' }];
   ok(allowedProviders(L, {} as any).length === 3 && allowedProviders(L, { AI_PROVIDER_ALLOWLIST: ' gemini ' } as any).map((x) => x.name).join() === 'Gemini' && allowedProviders(L, { AI_PROVIDER_ALLOWLIST: 'none' } as any).length === 0, 'provider allowlist: unset=all, named=only those');
   ok(shouldRunWorkerInWeb({ WORKER_IN_WEB: 'true' } as any), 'worker-in-web only with explicit true');
-  srv.close(); console.log(`api+worker tests passed (${n} assertions) on PGlite`);
+  // auth routes
+  const authRouter = (await import('../src/routes/auth')).default;
+  const app2 = express(); app2.use(express.json()); app2.use('/api/auth', authRouter);
+  const srv2 = app2.listen(0); const ab = `http://127.0.0.1:${(srv2.address() as AddressInfo).port}/api/auth`;
+  const aj = async (u: string, body?: any, token?: string) => { const x = await fetch(ab + u, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: body ? JSON.stringify(body) : undefined }); return { status: x.status, body: await x.json() as any }; };
+  let a = await aj('/register', { email: 'Teacher@Example.com', password: 'short' }); ok(a.status === 400, 'short password rejected');
+  a = await aj('/register', { email: 'Teacher@Example.com', password: 'longenough1' }); ok(a.status === 201 && a.body.data.user.email === 'teacher@example.com' && !!a.body.data.token, 'register lowercases email, returns token');
+  const utok = a.body.data.token;
+  a = await aj('/register', { email: 'teacher@example.com', password: 'longenough1' }); ok(a.status === 409, 'duplicate email 409');
+  a = await aj('/login', { email: 'teacher@example.com', password: 'wrongwrong' }); ok(a.status === 401, 'wrong password 401');
+  a = await aj('/login', { email: 'teacher@example.com', password: 'longenough1' }); ok(a.status === 200 && !!a.body.data.token, 'login ok');
+  a = await aj('/me', undefined, utok); ok(a.status === 200 && a.body.data.email === 'teacher@example.com', 'me with token');
+  a = await aj('/me'); ok(a.status === 401, 'me without token 401');
+  srv2.close(); srv.close(); console.log(`api+worker tests passed (${n} assertions) on PGlite`);
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { connectDB } from './services/db';
 import { initWebSocket } from './services/websocket';
+import { verifyToken } from './services/auth';
+import authRoutes from './routes/auth';
 import assignmentRoutes from './routes/assignments';
 import jobRoutes from './routes/jobs';
 
@@ -46,8 +48,9 @@ app.use(express.json({ limit: '10mb' }));
 const genHits = new Map<string, number[]>();
 app.use((req, res, next) => {
   const isGen = req.method === 'POST' && /^\/api\/assignments(\/[^/]+\/regenerate)?\/?$/.test(req.path);
+  const uid = (() => { const h = req.headers.authorization || ''; return h.startsWith('Bearer ') ? verifyToken(h.slice(7)) : null; })();
   if (!isGen) return next();
-  const ip = String(req.headers['x-forwarded-for'] || req.ip || '').split(',').pop()!.trim();
+  const ip = uid ? `user:${uid}` : String(req.headers['x-forwarded-for'] || req.ip || '').split(',').pop()!.trim();
   const now = Date.now();
   const hits = (genHits.get(ip) || []).filter((t) => now - t < 3600_000);
   if (hits.length >= Number(process.env.GEN_LIMIT_PER_HOUR || 10)) {
@@ -59,6 +62,7 @@ app.use((req, res, next) => {
 });
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/jobs', jobRoutes);
 
