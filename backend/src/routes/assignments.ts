@@ -74,7 +74,7 @@ router.post('/', async (req: Request, res: Response) => {
     const assignment = await Assignment.create({ ...data, dueDate }, req.userId!);
 
     const queue = getAssignmentQueue();
-    const job = await queue.add('generate', { assignmentId: assignment._id, clientId: data.clientId });
+    const job = await queue.add('generate', { assignmentId: assignment._id, clientId: data.clientId ? `${req.userId}:${data.clientId}` : undefined });
     await Assignment.setJobId(assignment._id, job.id?.toString());
 
     return res.status(201).json({ success: true, data: { id: assignment._id, _id: assignment._id, jobId: job.id, status: 'pending' } });
@@ -95,7 +95,7 @@ router.post('/:id/regenerate', async (req: Request, res: Response) => {
     await redis.del(`assignment:${req.params.id}`);
 
     const queue = getAssignmentQueue();
-    const job = await queue.add('generate', { assignmentId: assignment._id, clientId: req.body.clientId });
+    const job = await queue.add('generate', { assignmentId: assignment._id, clientId: req.body?.clientId ? `${req.userId}:${req.body.clientId}` : undefined });
     await Assignment.setJobId(assignment._id, job.id?.toString());
 
     return res.json({ success: true, data: { jobId: job.id, status: 'pending' } });
