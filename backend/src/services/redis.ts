@@ -1,3 +1,4 @@
+import { redactSecrets } from './redact';
 import Redis from 'ioredis';
 
 let redisClient: Redis | null = null;
@@ -16,7 +17,7 @@ export function getRedis(): Redis {
     });
 
     redisClient.on('connect', () => console.log('✅ Redis connected'));
-    redisClient.on('error', (err) => console.error('❌ Redis error:', err.message));
+    redisClient.on('error', (err) => console.error('❌ Redis error:', redactSecrets(err.message)));
   }
   return redisClient;
 }
