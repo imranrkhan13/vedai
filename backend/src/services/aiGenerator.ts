@@ -22,6 +22,7 @@ RULES:
 - Questions must be specific, academically rigorous, and about ${a.subject}
 - Each question must have: text, difficulty (easy|medium|hard), marks (number), type (string), answer (the correct answer or a short model answer)
 - Every MCQ question MUST also have an "options" array of exactly 4 distinct answer choices (plain text, no A/B/C/D prefixes), and its "answer" must be exactly one of those options
+- Every question must test a different fact or skill; never ask about the same fact twice, even in different words
 - Use ONLY these question types, and use each at least once: ${a.questionTypes.join(', ')}. Set each question's "type" to the matching label (MCQ, Short, Long, Diagram, Numerical, True/False, Fill, Essay)
 - Question marks must add up to exactly ${a.totalMarks}
 - Group into logical sections: Section A = short/MCQ (1-2 marks), Section B = medium (3-5 marks), Section C = long (5-10 marks)
@@ -225,6 +226,16 @@ function validatePaper(sections: ISection[], a: IAssignment): void {
       if (got.length !== row.qty) throw new Error(`Expected ${row.qty} "${row.type}" questions, got ${got.length}`);
       const bad = got.find((q) => q.marks !== row.marks);
       if (bad) throw new Error(`A "${row.type}" question is worth ${bad.marks} marks, expected ${row.marks}`);
+    }
+  }
+  const toks = (t: string) => new Set(t.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 2));
+  for (let i = 0; i < all.length; i++) {
+    const ti = toks(all[i].text);
+    for (let j = i + 1; j < all.length; j++) {
+      const tj = toks(all[j].text);
+      const inter = [...ti].filter((w) => tj.has(w)).length;
+      const union = new Set([...ti, ...tj]).size || 1;
+      if (inter / union >= 0.7) throw new Error(`Questions ${i + 1} and ${j + 1} are near duplicates`);
     }
   }
   const marks = all.reduce((n, q) => n + q.marks, 0);
