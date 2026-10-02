@@ -64,8 +64,11 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
   r = await j('/' + id, { method: 'DELETE' }); ok(r.body.success, 'delete ok');
   r = await j('/' + id); ok(r.status === 404, 'deleted -> 404');
   ok(!shouldRunWorkerInWeb({} as any) && !shouldRunWorkerInWeb({ WORKER_IN_WEB: 'false' } as any) && !shouldRunWorkerInWeb({ WORKER_IN_WEB: '1' } as any), 'worker-in-web off by default');
-  const { allowedProviders, resolveOpenRouterModel } = await import('../src/services/aiGenerator');
+  const { allowedProviders, resolveOpenRouterModel, resolveOpenRouterModels, redactError } = await import('../src/services/aiGenerator');
   ok(resolveOpenRouterModel({ OPENROUTER_MODEL: 'google/gemma-4-31b-it:free' } as any) === 'google/gemma-4-31b-it:free' && resolveOpenRouterModel({} as any).endsWith(':free'), 'openrouter free model accepted/default is free');
+  ok(resolveOpenRouterModels({ OPENROUTER_MODEL: 'a/b:free, c/d:free' } as any).length === 2 && resolveOpenRouterModels({ OPENROUTER_MODEL: 'a:free,b:free,c:free,d:free' } as any).length === 3, 'free model list capped at 3');
+  assert.throws(() => resolveOpenRouterModels({ OPENROUTER_MODEL: 'a:free,paid/model' } as any)); n++;
+  ok(!redactError('bad key sk-abcdefgh12345 Bearer xyz SECRETKEY', 'SECRETKEY').includes('SECRETKEY') && !redactError('x sk-abcdefgh12345').includes('sk-abcdefgh12345'), 'error redaction');
   assert.throws(() => resolveOpenRouterModel({ OPENROUTER_MODEL: 'meta-llama/llama-3.3-70b-instruct' } as any)); n++;
   const L = [{ name: 'Groq' }, { name: 'Gemini' }, { name: 'Cohere' }];
   ok(allowedProviders(L, {} as any).length === 3 && allowedProviders(L, { AI_PROVIDER_ALLOWLIST: ' gemini ' } as any).map((x) => x.name).join() === 'Gemini' && allowedProviders(L, { AI_PROVIDER_ALLOWLIST: 'none' } as any).length === 0, 'provider allowlist: unset=all, named=only those');
