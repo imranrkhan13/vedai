@@ -48,7 +48,7 @@ async function tryGemini(prompt: string): Promise<string> {
   const key = process.env.GEMINI_API_KEY;
   if (!key || key.includes('your_')) throw new Error('No Gemini key');
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL || 'gemini-1.5-flash'}:generateContent?key=${key}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4, maxOutputTokens: 4096 } }) }
   );
@@ -127,8 +127,19 @@ const PROVIDERS = [
   { name: 'Cohere',     fn: tryCohere },
 ];
 
+// Optional spend guard: AI_PROVIDER_ALLOWLIST=gemini limits the chain to the named providers.
+// Unset = legacy behaviour (all providers, in order).
+export function allowedProviders<T extends { name: string }>(list: T[], env: NodeJS.ProcessEnv = process.env): T[] {
+  const raw = (env.AI_PROVIDER_ALLOWLIST || '').trim();
+  if (!raw) return list;
+  const want = raw.split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+  return list.filter((p) => want.includes(p.name.toLowerCase()));
+}
+
+export function activeProviders() { return allowedProviders(PROVIDERS); }
+
 async function callWithFallback(prompt: string): Promise<string | null> {
-  for (const p of PROVIDERS) {
+  for (const p of activeProviders()) {
     try {
       console.log(`[AI] Trying ${p.name}...`);
       const result = await p.fn(prompt);
