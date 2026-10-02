@@ -10,6 +10,51 @@ import toast from 'react-hot-toast';
 import { Loader2, Download, RefreshCw, Copy, Check, ArrowLeft, CheckCircle } from 'lucide-react';
 
 
+function RubricGuide({ a, onSaved }:{ a:any; onSaved:()=>void }){
+  const qs:Question[] = (a.output.sections as Section[]).flatMap((sec:Section)=>sec.questions).filter((q:Question)=>q.rubric&&q.rubric.length===3);
+  const [edit,setEdit] = useState<Record<string,{marks:number;descriptor:string;example:string}[]>>({});
+  const [busy,setBusy] = useState('');
+  if(qs.length===0) return null;
+  const get = (q:Question)=> edit[q.id]||(q.rubric as any[]);
+  const change = (q:Question,i:number,k:'marks'|'descriptor'|'example',v:string)=>{
+    const cur = get(q).map(x=>({...x}));
+    (cur[i] as any)[k] = k==='marks'?Number(v):v;
+    setEdit(e=>({...e,[q.id]:cur}));
+  };
+  const save = async (q:Question)=>{
+    const lv = get(q);
+    if(lv.some(l=>!Number.isInteger(l.marks)||l.marks<0||l.marks>q.marks)){ toast.error(`Marks must be whole numbers from 0 to ${q.marks}`); return; }
+    if(!(lv[0].marks>lv[1].marks&&lv[1].marks>lv[2].marks)){ toast.error('Levels must go from higher to lower marks'); return; }
+    setBusy(q.id);
+    try { await api.saveRubric(a._id||a.id, q.id, lv); toast.success('Marking guide saved'); setEdit(e=>{ const n={...e}; delete n[q.id]; return n; }); onSaved(); }
+    catch(err:unknown){ toast.error(err instanceof Error?err.message:'Could not save'); }
+    finally { setBusy(''); }
+  };
+  return (
+    <div className="card fade-up" style={{ padding:'16px 20px', marginTop:14, maxWidth:760 }}>
+      <h3 style={{ fontSize:14, fontWeight:700, color:'var(--black)', marginBottom:4 }}>Marking guide (AI draft for teacher review)</h3>
+      <p style={{ fontSize:11, color:'var(--gray-500)', lineHeight:1.5, marginBottom:12 }}>For questions worth 3 or more marks. The AI wrote three levels with a sample answer each. The sample answers are made up to illustrate the levels, they are not student work, and they may contain mistakes or go beyond your notes. Edit anything, then save. You decide the final marks. Not shown in the PDF.</p>
+      {qs.map((q,qi)=>(
+        <div key={q.id} style={{ borderTop:qi?'1px solid var(--border)':'none', paddingTop:qi?12:0, marginTop:qi?12:0 }}>
+          <p style={{ fontSize:13, fontWeight:600, color:'var(--black)', marginBottom:6 }}>{q.text} <span style={{ color:'var(--gray-500)', fontWeight:500 }}>[max {q.marks}]</span></p>
+          {q.rubricEdited&&!edit[q.id]&&<p style={{ fontSize:11, color:'var(--gray-500)', marginBottom:6 }}>Edited by you.</p>}
+          {q.evidence&&<p style={{ fontSize:11, color:'var(--gray-500)', fontStyle:'italic', marginBottom:6 }}>Source sentence the model says it used: &ldquo;{q.evidence}&rdquo;</p>}
+          {get(q).map((l,i)=>(
+            <div key={i} style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
+              <input className="input" type="number" min={0} max={q.marks} value={l.marks} onChange={e=>change(q,i,'marks',e.target.value)} style={{ width:64, height:34, fontSize:13 }} aria-label={`Marks for level ${i+1}`}/>
+              <div style={{ flex:1, minWidth:200, display:'flex', flexDirection:'column', gap:4 }}>
+                <textarea className="input" value={l.descriptor} onChange={e=>change(q,i,'descriptor',e.target.value)} style={{ minHeight:44, fontSize:12 }} aria-label={`Description for level ${i+1}`}/>
+                <textarea className="input" value={l.example} onChange={e=>change(q,i,'example',e.target.value)} style={{ minHeight:60, fontSize:12 }} aria-label={`Sample answer for level ${i+1}`}/>
+              </div>
+            </div>
+          ))}
+          {edit[q.id]&&<button className="btn btn-orange" onClick={()=>save(q)} disabled={busy===q.id} style={{ fontSize:12 }}>{busy===q.id?'Saving...':'Save changes'}</button>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const DIFF_LABEL: Record<string,string> = { easy:'Easy', medium:'Moderate', hard:'Challenging' };
 
 export default function OutputPage() {
@@ -236,6 +281,8 @@ export default function OutputPage() {
                   )}
                 </div>
               </div>
+
+              <RubricGuide key={JSON.stringify((a.output.sections as Section[]).flatMap((x:Section)=>x.questions.map((y:Question)=>y.rubric||null)))} a={a} onSaved={()=>{ api.getAssignment(a._id||(a as any).id).then(()=>window.location.reload()).catch(()=>window.location.reload()); }}/>
 
               {/* Difficulty breakdown */}
               <div className="card fade-up" style={{ padding:'14px 20px', marginTop:14, maxWidth:760, display:'flex', gap:20, alignItems:'center', flexWrap:'wrap' }}>
