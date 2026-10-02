@@ -12,6 +12,11 @@ export interface Question {
   evidence?: string;
   rubric?: { marks: number; descriptor: string; example: string }[];
   rubricEdited?: boolean;
+  grade?: {
+    answer: string; levelIndex: number; marks: number; probabilities: Record<string, number>;
+    confidence: number; score: number; model: string; rubricSnapshot: { marks: number; descriptor: string }[];
+    gradedAt: string; teacherMarks?: number; reason?: string; edited?: boolean;
+  };
 }
 
 export interface Section {
