@@ -9,6 +9,7 @@ export interface Question {
   type: string;
   options?: string[];
   answer?: string;
+  evidence?: string;
 }
 
 export interface Section {
