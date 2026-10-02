@@ -73,6 +73,14 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
     ok(g.sections[0].questions[0].options?.length === 4 && g.sections[0].questions[0].answer === 'b' && g.totalMarks === 4, 'parse keeps MCQ options, answer, real marks total');
     ok(parseResponse(good.replace('}]}]}', '}]},{"title":"C","questions":[]}]}'), A).sections.length === 1, 'empty sections are dropped');
     assert.throws(() => parseResponse(good.replace('"options":["a","b","c","d"],', ''), A), /MCQ without answer choices/); n++;
+    { const P: any = { ...A, numberOfQuestions: 3, totalMarks: 5, questionPlan: [{ type: 'Multiple Choice Questions', qty: 1, marks: 1 }, { type: 'Short Questions', qty: 2, marks: 2 }] };
+      const three = JSON.stringify({ sections: [{ title: 'A', questions: [{ text: 'Q1?', marks: 1, type: 'MCQ', options: ['a', 'b', 'c', 'd'], answer: 'a' }, { text: 'Q2?', marks: 2, type: 'Short', answer: 'x' }, { text: 'Q3?', marks: 2, type: 'Short', answer: 'y' }] }] });
+      ok(parseResponse(three, P).totalMarks === 5, 'plan satisfied: per-type counts and marks');
+      assert.throws(() => parseResponse(three.replace('"marks":2,"type":"Short","answer":"y"', '"marks":1,"type":"Short","answer":"y"'), { ...P, totalMarks: 4 }), /worth 1 marks, expected 2/); n++;
+      assert.throws(() => parseResponse(three.replace('"type":"Short","answer":"y"', '"type":"MCQ","options":["a","b","c","d"],"answer":"a"'), P), /Expected 1 "Multiple Choice Questions" questions, got 2/); n++;
+      const bad = await j('/', { method: 'POST', body: JSON.stringify({ title: 't', subject: 's', dueDate: '2026-10-20', questionTypes: ['x'], numberOfQuestions: 3, totalMarks: 9, questionPlan: P.questionPlan }) });
+      ok(bad.status === 400, 'route rejects a plan that does not add up');
+    }
     assert.throws(() => parseResponse(good, { ...A, numberOfQuestions: 3 }), /expected 3/); n++;
     assert.throws(() => parseResponse(good.replace('"Short"', '"Long"'), A), /not requested/); n++;
     assert.throws(() => parseResponse(good.replace('"answer":"b"', '"answer":"z"'), A), /not one of its options/); n++;
