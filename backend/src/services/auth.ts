@@ -24,13 +24,14 @@ export function verifyPassword(pw: string, stored: string): boolean {
 
 const b64 = (b: Buffer | string) => Buffer.from(b).toString('base64url');
 
-export function signToken(uid: string, ttlSeconds = 7 * 24 * 3600): string {
-  const body = b64(JSON.stringify({ uid, exp: Math.floor(Date.now() / 1000) + ttlSeconds }));
+// aud separates token kinds: session tokens have no aud, WebSocket tickets use aud "ws" and live 60 seconds.
+export function signToken(uid: string, ttlSeconds = 7 * 24 * 3600, aud?: string): string {
+  const body = b64(JSON.stringify({ uid, aud, exp: Math.floor(Date.now() / 1000) + ttlSeconds }));
   const sig = b64(crypto.createHmac('sha256', secret()).update(body).digest());
   return `${body}.${sig}`;
 }
 
-export function verifyToken(token: string): string | null {
+export function verifyToken(token: string, aud?: string): string | null {
   const [body, sig] = token.split('.');
   if (!body || !sig) return null;
   const want = crypto.createHmac('sha256', secret()).update(body).digest();
@@ -38,6 +39,7 @@ export function verifyToken(token: string): string | null {
   if (got.length !== want.length || !crypto.timingSafeEqual(got, want)) return null;
   try {
     const p = JSON.parse(Buffer.from(body, 'base64url').toString());
+    if ((p.aud || undefined) !== aud) return null;
     if (typeof p.uid !== 'string' || typeof p.exp !== 'number' || p.exp < Date.now() / 1000) return null;
     return p.uid;
   } catch { return null; }
@@ -45,9 +47,38 @@ export function verifyToken(token: string): string | null {
 
 declare module 'express-serve-static-core' { interface Request { userId?: string } }
 
+export const COOKIE = 'qx_session';
+const WEEK = 7 * 24 * 3600;
+const secureCookie = () => process.env.NODE_ENV === 'production' || process.env.COOKIE_SECURE === 'true';
+
+export function setSession(res: Response, uid: string) {
+  res.setHeader('Set-Cookie', `${COOKIE}=${signToken(uid)}; Max-Age=${WEEK}; Path=/; HttpOnly; SameSite=Lax${secureCookie() ? '; Secure' : ''}`);
+}
+export function clearSession(res: Response) {
+  res.setHeader('Set-Cookie', `${COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax${secureCookie() ? '; Secure' : ''}`);
+}
+function cookieToken(req: Request): string | null {
+  for (const part of (req.headers.cookie || '').split(';')) {
+    const [k, ...v] = part.trim().split('=');
+    if (k === COOKIE) return v.join('=');
+  }
+  return null;
+}
+
+// Session comes from the httpOnly cookie (or a Bearer token for scripts). For cookie sessions, state-changing requests
+// must carry the custom header X-Requested-With: quillix, which a cross-site form or image cannot send (CSRF defence, on top of SameSite=Lax).
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const h = req.headers.authorization || '';
-  const uid = h.startsWith('Bearer ') ? verifyToken(h.slice(7)) : null;
+  let uid: string | null = null;
+  if (h.startsWith('Bearer ')) uid = verifyToken(h.slice(7));
+  else {
+    const c = cookieToken(req);
+    if (c) {
+      uid = verifyToken(c);
+      const safe = req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS';
+      if (uid && !safe && req.headers['x-requested-with'] !== 'quillix') return res.status(403).json({ success: false, error: 'Blocked request' });
+    }
+  }
   if (!uid) return res.status(401).json({ success: false, error: 'Please sign in' });
   req.userId = uid;
   next();
