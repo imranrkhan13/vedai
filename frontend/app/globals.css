@@ -216,8 +216,10 @@ input[type="number"] { -moz-appearance: textfield; }
 .qgrid { grid-template-columns: 1fr 120px 100px 36px; }
 .mlabel { display: none; font-size: 11px; color: var(--gray-500); }
 @media (max-width: 520px) {
-  .qgrid { grid-template-columns: 1fr 1fr 32px; }
-  .qgrid > .qsel, .qgrid > :first-child { grid-column: 1 / -1 !important; }
+  .qgrid { grid-template-columns: minmax(0,1fr) 32px; }
+  .qgrid > :first-child { grid-column: 1 / 2 !important; min-width: 0; }
+  .qgrid > :nth-child(4) { grid-column: 2 / 3 !important; grid-row: 1 !important; }
+  .qgrid > :nth-child(2), .qgrid > :nth-child(3) { grid-column: 1 / -1 !important; justify-content: flex-start !important; }
   .qhead { display: none !important; }
   .mlabel { display: inline; }
 }
