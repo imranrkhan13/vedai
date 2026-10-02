@@ -10,15 +10,6 @@ import toast from 'react-hot-toast';
 import { Loader2, Download, RefreshCw, Copy, Check, ArrowLeft, CheckCircle } from 'lucide-react';
 
 
-const STOP = new Set('the a an of and or to in on for is are was were be by with as at from that this it its which what why how explain describe state give list define write name'.split(' '));
-const toks = (t:string)=> (t.toLowerCase().match(/[a-z0-9]+/g)||[]).filter(w=>w.length>2&&!STOP.has(w));
-function reviewHint(q:string, src:string){
-  const qt = new Set(toks(q)); if(!src||qt.size<3) return null;
-  const parts = src.split(/(?<=[.!?\n])\s+/).map(x=>x.trim()).filter(x=>x.length>8);
-  let best='', score=0;
-  for(const p of parts){ const pt=new Set(toks(p)); let n=0; qt.forEach(w=>{ if(pt.has(w)) n++; }); const sc=n/qt.size; if(sc>score){score=sc;best=p;} }
-  return { score, best };
-}
 const DIFF_LABEL: Record<string,string> = { easy:'Easy', medium:'Moderate', hard:'Challenging' };
 
 export default function OutputPage() {
@@ -213,7 +204,7 @@ export default function OutputPage() {
                               <span style={{ color:'var(--gray-500)' }}>[{DIFF_LABEL[q.difficulty]||q.difficulty}] </span>
                               {q.text}
                               <span style={{ fontWeight:600, color:'var(--gray-700)' }}> [{q.marks} Mark{q.marks>1?'s':''}]</span>
-                              {(()=>{ const h=reviewHint(q.text,(a as any).fileContent||''); if(!h||h.score>=0.25) return null; return (<div data-html2canvas-ignore="true" style={{ marginTop:6, fontSize:11, color:'var(--gray-500)', fontStyle:'italic' }}>Review hint: little wording overlap with your source ({Math.round(h.score*100)}%). This is a wording check only, not proof the question is wrong or unsupported. Closest source line: &ldquo;{h.best.slice(0,140)}&rdquo;</div>); })()}
+                              {(a as any).fileContent&&(<div data-html2canvas-ignore="true" style={{ marginTop:6, fontSize:11, color:'var(--gray-500)', fontStyle:'italic' }}>{q.evidence?<>Source sentence this question is based on (matched to your text): &ldquo;{q.evidence}&rdquo;</>:<>Review: no sentence from your source was matched to this question. Please check it yourself. (Text-match check only, not a judgment of correctness.)</>}</div>)}
                               {q.options&&q.options.length>0&&(
                                 <ol style={{ listStyle:'none', padding:0, margin:'6px 0 0' }}>
                                   {q.options.map((o:string,oi:number)=>(<li key={oi} style={{ marginBottom:2 }}>({String.fromCharCode(97+oi)}) {o}</li>))}
