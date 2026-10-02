@@ -21,7 +21,7 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
   const pg = new PGlite(); await pg.exec(SCHEMA_SQL);
   setDb({ query: async (t, p) => { const r = await pg.query(t, p as any[]); return { rows: r.rows as any[], rowCount: r.affectedRows ?? r.rows.length }; } });
   const router = (await import('../src/routes/assignments')).default;
-  const { processAssignmentJob } = await import('../src/worker');
+  const { processAssignmentJob, shouldRunWorkerInWeb } = await import('../src/worker');
 
   const app = express(); app.use(express.json()); app.use('/api/assignments', router);
   const srv = app.listen(0); const base = `http://127.0.0.1:${(srv.address() as AddressInfo).port}/api/assignments`;
@@ -58,5 +58,10 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
   r = await j('/not-a-uuid'); ok(r.status === 404, 'bad id 404');
   r = await j('/' + id, { method: 'DELETE' }); ok(r.body.success, 'delete ok');
   r = await j('/' + id); ok(r.status === 404, 'deleted -> 404');
+  ok(!shouldRunWorkerInWeb({} as any) && !shouldRunWorkerInWeb({ WORKER_IN_WEB: 'false' } as any) && !shouldRunWorkerInWeb({ WORKER_IN_WEB: '1' } as any), 'worker-in-web off by default');
+  const { allowedProviders } = await import('../src/services/aiGenerator');
+  const L = [{ name: 'Groq' }, { name: 'Gemini' }, { name: 'Cohere' }];
+  ok(allowedProviders(L, {} as any).length === 3 && allowedProviders(L, { AI_PROVIDER_ALLOWLIST: ' gemini ' } as any).map((x) => x.name).join() === 'Gemini' && allowedProviders(L, { AI_PROVIDER_ALLOWLIST: 'none' } as any).length === 0, 'provider allowlist: unset=all, named=only those');
+  ok(shouldRunWorkerInWeb({ WORKER_IN_WEB: 'true' } as any), 'worker-in-web only with explicit true');
   srv.close(); console.log(`api+worker tests passed (${n} assertions) on PGlite`);
 })().catch((e) => { console.error(e); process.exit(1); });
