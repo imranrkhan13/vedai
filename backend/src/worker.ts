@@ -44,12 +44,17 @@ export async function processAssignmentJob(job: Job) {
   return { assignmentId, status: 'completed' };
 }
 
-async function startWorker() {
-  await connectDB();
+// Opt-in only: the web process runs the queue worker when WORKER_IN_WEB=true (default off).
+export function shouldRunWorkerInWeb(env: NodeJS.ProcessEnv = process.env): boolean {
+  return String(env.WORKER_IN_WEB || '').toLowerCase() === 'true';
+}
+
+export async function startWorker(opts: { connect?: boolean } = {}) {
+  if (opts.connect !== false) await connectDB();
 
   const worker = new Worker('assignment-generation', processAssignmentJob, {
     connection: getRedis(),
-    concurrency: 3,
+    concurrency: Math.max(1, parseInt(process.env.WORKER_CONCURRENCY || '1', 10) || 1),
   });
 
   worker.on('completed', (job) => console.log(`✅ Job ${job.id} completed`));
