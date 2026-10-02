@@ -61,25 +61,46 @@ async function tryGemini(prompt: string): Promise<string> {
 
 // Spend guard: only OpenRouter models whose id ends in ":free" are ever requested.
 export function resolveOpenRouterModel(env: NodeJS.ProcessEnv = process.env): string {
-  const model = (env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free').trim();
-  if (!model.endsWith(':free')) throw new Error('OpenRouter model is not a :free model; blocked');
-  return model;
+  return resolveOpenRouterModels(env)[0];
+}
+
+export function resolveOpenRouterModels(env: NodeJS.ProcessEnv = process.env): string[] {
+  const list = (env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free').split(',').map((m) => m.trim()).filter(Boolean).slice(0, 3);
+  for (const m of list) if (!m.endsWith(':free')) throw new Error('OpenRouter model is not a :free model; blocked');
+  return list;
+}
+
+export function redactError(text: string, key?: string): string {
+  let t = String(text).slice(0, 300).replace(/\s+/g, ' ');
+  if (key) t = t.split(key).join('***');
+  return t.replace(/(sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)/g, '***');
 }
 
 async function tryOpenRouter(prompt: string): Promise<string> {
-  const model = resolveOpenRouterModel();
   const key = process.env.OPENROUTER_API_KEY;
   if (!key || key.includes('your_')) throw new Error('No OpenRouter key');
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'HTTP-Referer': 'https://vedaai.app', 'X-Title': 'VedaAI' },
-    body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 4096, temperature: 0.4 }),
-  });
-  if (!res.ok) throw new Error(`OpenRouter ${res.status}`);
-  const data = await res.json() as any;
-  const text = data?.choices?.[0]?.message?.content;
-  if (!text) throw new Error('OpenRouter: empty');
-  return text;
+  const models = resolveOpenRouterModels(); // each is a :free model; each is tried at most once per job
+  let lastErr = 'OpenRouter: no model tried';
+  for (const model of models) {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'HTTP-Referer': 'https://vedaai.app', 'X-Title': 'VedaAI' },
+      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 4096, temperature: 0.4 }),
+    });
+    if (!res.ok) {
+      const body = redactError(await res.text().catch(() => ''), key);
+      lastErr = `OpenRouter ${model} ${res.status}: ${body}`;
+      console.warn(`[AI] ${lastErr}`);
+      if (res.status === 401 || res.status === 402 || res.status === 403) break; // auth or credits problem: stop, do not try more
+      continue;
+    }
+    const data = await res.json() as any;
+    const text = data?.choices?.[0]?.message?.content;
+    if (text) return text;
+    lastErr = `OpenRouter ${model}: empty`;
+    console.warn(`[AI] ${lastErr}`);
+  }
+  throw new Error(lastErr);
 }
 
 async function tryGroq(prompt: string): Promise<string> {
