@@ -35,7 +35,7 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
   let r = await j('', { method: 'POST', body: JSON.stringify(body) });
   ok(r.status === 201 && r.body.success, 'create 201');
   const id = r.body.data.id; ok(id === r.body.data._id && /^[0-9a-f-]{36}$/.test(id), 'id and _id returned');
-  ok(jobs.length === 1 && jobs[0].data.assignmentId === id && jobs[0].data.clientId === 'c1', 'job enqueued with assignmentId+clientId');
+  ok(jobs.length === 1 && jobs[0].data.assignmentId === id && jobs[0].data.clientId === 'user-1:c1', 'job enqueued with assignmentId+clientId');
   r = await j('', { method: 'POST', body: JSON.stringify({ ...body, dueDate: 'nope' }) }); ok(r.status === 400, 'bad date 400');
   r = await j('', { method: 'POST', body: JSON.stringify({ title: '' }) }); ok(r.status === 400, 'validation 400');
 
@@ -46,7 +46,7 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
   await processAssignmentJob({ id: '0', data: jobs[0].data, updateProgress: async () => {} } as any).then(() => assert.fail('should throw'), (e) => { ok(/AI providers/.test(e.message), 'no-provider run throws'); });
   process.env.ALLOW_MOCK_OUTPUT = 'true';
   await processAssignmentJob({ id: '1', data: jobs[0].data, updateProgress: async () => {} } as any); // worker persistence, mock paper (no keys)
-  ok(notices.some(([c, p]) => c === 'c1' && p.type === 'job:completed'), 'worker notified completion');
+  ok(notices.some(([c, p]) => c === 'user-1:c1' && p.type === 'job:completed'), 'worker notified completion');
   r = await j('/' + id);
   const o = r.body.data.output;
   ok(r.body.data.status === 'completed' && o && Array.isArray(o.sections) && o.sections.length > 0, 'output persisted with sections');
