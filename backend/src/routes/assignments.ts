@@ -67,6 +67,10 @@ router.post('/', async (req: Request, res: Response) => {
       }
       data.questionTypes = data.questionPlan.map((r) => r.type);
     }
+    if (data.fileContent && data.fileContent.trim().length > 0 && data.fileContent.trim().length < data.numberOfQuestions * 40) {
+      const fit = Math.max(1, Math.floor(data.fileContent.trim().length / 40));
+      return res.status(400).json({ success: false, error: 'Source text is too short for ' + data.numberOfQuestions + ' questions. Add more notes or ask for about ' + fit + ' or fewer (rough guide: 40 characters of source per question).' });
+    }
     const dueDate = new Date(data.dueDate);
     if (Number.isNaN(dueDate.getTime())) {
       return res.status(400).json({ success: false, error: 'Validation failed', details: [{ path: ['dueDate'], message: 'Invalid date' }] });
