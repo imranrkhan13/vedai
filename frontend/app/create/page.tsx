@@ -25,6 +25,9 @@ export default function CreatePage() {
   const router = useRouter();
   const { clientId, initWebSocket } = useAssignmentStore();
   const [submitting, setSubmitting] = useState(false);
+  const [versions, setVersions] = useState(1);
+  const [batch, setBatch] = useState<{n:number;id?:string;state:string;note?:string}[]>([]);
+  const [batchWarn, setBatchWarn] = useState<string[]>([]);
   const [fileName, setFileName] = useState('');
   const [fileContent, setFileContent] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -131,25 +134,67 @@ export default function CreatePage() {
     return Object.keys(e).length===0;
   };
 
+  const qwords = (t:string)=> new Set((t.toLowerCase().match(/[a-z0-9]+/g)||[]).filter(w=>w.length>2));
+  const sim = (x:string,y:string)=>{ const A=qwords(x),B=qwords(y); let n=0; A.forEach(w=>{ if(B.has(w)) n++; }); return n/((A.size+B.size-n)||1); };
+  const questionsOf = (a:any):string[] => ((a?.output?.sections||[]) as any[]).flatMap((sec:any)=>(sec.questions||[]).map((q:any)=>String(q.text||'')));
+  const sleep = (ms:number)=> new Promise(r=>setTimeout(r,ms));
+
   const handleSubmit = async () => {
     if(!validate()){ toast.error('Please fix the errors'); return; }
-    setSubmitting(true);
+    setSubmitting(true); setBatchWarn([]);
+    const base = {
+      subject, dueDate,
+      questionTypes: qRows.map(r=>r.type),
+      questionPlan: qRows.map(r=>({ type:r.type, qty:r.qty, marks:r.marks })),
+      numberOfQuestions: totalQ, totalMarks: totalM,
+      difficulty: 'mixed' as const,
+      fileContent: fileContent||undefined,
+      clientId: clientId||undefined,
+    };
+    const baseTitle = title.trim()||`${subject} Assessment`;
+    if(versions<=1){
+      try {
+        const result = await api.createAssignment({ ...base, title: baseTitle, additionalInstructions: additionalInfo||undefined });
+        toast.success('Generating question paper...');
+        router.push(`/output/${result.id}`);
+      } catch(err:unknown){
+        toast.error(err instanceof Error?err.message:'Failed');
+      } finally { setSubmitting(false); }
+      return;
+    }
+    // Several versions: one at a time. Stop at the first failure and keep finished versions.
+    const rows:{n:number;id?:string;state:string;note?:string}[] = Array.from({length:versions},(_,i)=>({n:i+1,state:'waiting'}));
+    setBatch([...rows]);
+    const texts:string[][] = [];
     try {
-      const result = await api.createAssignment({
-        title: title.trim()||`${subject} Assessment`,
-        subject, dueDate,
-        questionTypes: qRows.map(r=>r.type),
-        questionPlan: qRows.map(r=>({ type:r.type, qty:r.qty, marks:r.marks })),
-        numberOfQuestions: totalQ, totalMarks: totalM,
-        difficulty: 'mixed',
-        additionalInstructions: additionalInfo||undefined,
-        fileContent: fileContent||undefined,
-        clientId: clientId||undefined,
-      });
-      toast.success('Generating question paper...');
-      router.push(`/output/${result.id}`);
-    } catch(err:unknown){
-      toast.error(err instanceof Error?err.message:'Failed');
+      for(let k=0;k<versions;k++){
+        rows[k]={n:k+1,state:'generating'}; setBatch([...rows]);
+        const extra = `This is version ${k+1} of ${versions} of the same paper. Other versions are generated separately, so choose a different selection of facts, wording and numbers from the other versions. For this version, start with the ${k+1===1?'first':k+1===2?'second':k+1===3?'third':`#${k+1}`} part of the material.`;
+        let id='';
+        try {
+          const r = await api.createAssignment({ ...base, title:`${baseTitle} - Version ${k+1}`, additionalInstructions: [additionalInfo, extra].filter(Boolean).join('\n'), clientId: undefined });
+          id = r.id;
+        } catch(err:unknown){
+          rows[k]={n:k+1,state:'stopped',note:err instanceof Error?err.message:'Could not start'}; setBatch([...rows]); break;
+        }
+        rows[k]={n:k+1,id,state:'generating'}; setBatch([...rows]);
+        let done:any=null;
+        for(let t=0;t<90;t++){
+          await sleep(5000);
+          try { const a:any = await api.getAssignment(id); if(a.status==='completed'||a.status==='failed'){ done=a; break; } } catch { /* keep waiting */ }
+        }
+        if(!done || done.status!=='completed'){
+          rows[k]={n:k+1,id,state:'stopped',note: done?'Generation failed (the free AI models may be busy or rate limited). Finished versions are kept.':'Still running after 7 minutes; check My Assignments later.'}; setBatch([...rows]); break;
+        }
+        texts.push(questionsOf(done));
+        rows[k]={n:k+1,id,state:'done'}; setBatch([...rows]);
+      }
+      const warns:string[]=[];
+      for(let i=0;i<texts.length;i++) for(let j=i+1;j<texts.length;j++){
+        const dup = texts[j].filter(q=>texts[i].some(p=>sim(p,q)>=0.6)).length;
+        if(dup>0) warns.push(`Versions ${i+1} and ${j+1} share ${dup} very similar question${dup>1?'s':''} (wording check only).`);
+      }
+      setBatchWarn(warns);
     } finally { setSubmitting(false); }
   };
 
@@ -279,14 +324,35 @@ export default function CreatePage() {
               value={additionalInfo} onChange={e=>setAdditionalInfo(e.target.value)}/>
           </div>
 
+          <div className="card fade-up" style={{ padding:'16px 22px', marginBottom:22 }}>
+            <label style={{ fontSize:13, fontWeight:600, color:'var(--black)', display:'block', marginBottom:8 }}>Paper versions</label>
+            <select className="input" value={versions} onChange={e=>setVersions(Number(e.target.value))} disabled={submitting} style={{ height:36, fontSize:13, maxWidth:120 }}>
+              {Array.from({length:10},(_,i)=>i+1).map(n=><option key={n} value={n}>{n}</option>)}
+            </select>
+            <p style={{ fontSize:11, color:'var(--gray-500)', marginTop:8, lineHeight:1.5 }}>Up to 10. Versions are made one at a time from the same notes. This app allows 10 paper generations per hour (its own limit). The free AI models can still be slow or fail. If one fails, the batch stops and finished versions are kept. Different wording is requested, not guaranteed; similar questions between versions are flagged below.</p>
+            {batch.length>0&&(
+              <div style={{ marginTop:12, fontSize:13, display:'flex', flexDirection:'column', gap:6 }}>
+                {batch.map(r=>(
+                  <div key={r.n} style={{ display:'flex', gap:8, alignItems:'baseline', flexWrap:'wrap' }}>
+                    <span style={{ fontWeight:600 }}>Version {r.n}:</span>
+                    <span style={{ color:r.state==='stopped'?'#DC2626':'var(--gray-700)' }}>{r.state==='done'?'ready':r.state==='generating'?'generating...':r.state==='waiting'?'waiting':'stopped'}</span>
+                    {r.id&&r.state==='done'&&<a href={`/output/${r.id}`} style={{ color:'var(--orange)', fontWeight:600 }}>Open</a>}
+                    {r.note&&<span style={{ fontSize:11, color:'var(--gray-500)' }}>{r.note}</span>}
+                  </div>
+                ))}
+                {batchWarn.map((w,i)=>(<p key={i} style={{ fontSize:12, color:'#B45309' }}>{w}</p>))}
+              </div>
+            )}
+          </div>
+
           <div className="fade-up" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <button className="btn btn-ghost" onClick={()=>router.push('/assignments')}>Previous</button>
             <button className="btn btn-orange" onClick={handleSubmit} disabled={submitting} style={{ minWidth:130 }}>
-              {submitting?<><Loader2 size={14} className="spin"/> Generating...</>:'Next →'}
+              {submitting?<><Loader2 size={14} className="spin"/> Generating...</>:(versions>1?`Make ${versions} versions →`:'Next →')}
             </button>
           </div>
         </div>
       </main>
     </div>
   );
-}
+                                                                                                                             }
