@@ -217,7 +217,13 @@ input[type="number"] { -moz-appearance: textfield; }
 .mlabel { display: none; font-size: 11px; color: var(--gray-500); }
 @media (max-width: 520px) {
   .qgrid { grid-template-columns: 1fr 1fr 32px; }
-  .qgrid > select { grid-column: 1 / -1; }
+  .qgrid > .qsel { grid-column: 1 / -1 !important; }
   .qhead { display: none !important; }
   .mlabel { display: inline; }
+}
+
+@media (max-width: 520px) {
+  .topbar { overflow-x: auto; gap: 6px; }
+  .main-content [style*="48px"] { padding-left: 16px !important; padding-right: 16px !important; }
+  .main-content [style*="48px"] input { width: auto !important; flex: 1; min-width: 0; }
 }
