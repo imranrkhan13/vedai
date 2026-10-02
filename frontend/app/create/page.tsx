@@ -188,11 +188,11 @@ export default function CreatePage() {
                   <Upload size={16} color="#9CA3AF"/>
                 </div>
                 <p style={{ fontSize:13, color:'var(--gray-500)', marginBottom:4 }}>Choose a file or drag &amp; drop it here</p>
-                <p style={{ fontSize:11, color:'var(--gray-400)', marginBottom:12 }}>TXT or text-based PDF, up to 10MB</p>
+                <p style={{ fontSize:11, color:'var(--gray-400)', marginBottom:12 }}>TXT, text-based PDF, or a clear printed image (PNG/JPG/WebP), up to 10MB</p>
                 <button className="btn btn-ghost btn-sm" type="button" onClick={e=>{e.stopPropagation();fileRef.current?.click();}}>Browse Files</button>
               </div>
             ):(
-              <div className="fade-in" style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'var(--orange-dim)', borderRadius:8, border:'1px solid var(--orange-border)', marginBottom:16 }}>
+              <><div className="fade-in" style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'var(--orange-dim)', borderRadius:8, border:'1px solid var(--orange-border)', marginBottom:16 }}>
                 <span style={{ fontSize:18 }}>📄</span>
                 <span style={{ flex:1, fontSize:13, fontWeight:500, color:'var(--black)' }}>{fileName}</span>
                 <button onClick={()=>{setFileName('');setFileContent('');}} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--gray-400)', padding:4, borderRadius:5, display:'flex', transition:'color 0.12s' }}
@@ -201,6 +201,8 @@ export default function CreatePage() {
                   <X size={14}/>
                 </button>
               </div>
+                <p style={{ fontSize:11, color:'var(--gray-500)', margin:'-8px 0 14px', lineHeight:1.5 }}>{fileContent.length.toLocaleString()} characters read.{fileContent.length>2000?' Only the first 2,000 characters are used to make questions; the rest is ignored. Split longer notes into parts.':''} Images are read in your browser and not uploaded. The text is sent to our server and to free AI models when you generate, so do not use private student content.</p>
+              </>
             )}
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
