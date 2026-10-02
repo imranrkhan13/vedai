@@ -36,8 +36,8 @@ export default function HomePage() {
             <div style={{ position:'absolute', right:-30, top:-30, width:220, height:220, borderRadius:'50%', background:'rgba(249,115,22,0.08)', animation:'float 4s ease-in-out infinite' }} />
             <div style={{ position:'absolute', right:60, bottom:-50, width:150, height:150, borderRadius:'50%', background:'rgba(249,115,22,0.05)', animation:'float 5s ease-in-out infinite 1s' }} />
             <div style={{ position:'relative' }}>
-              <p style={{ fontSize:12, color:'#9CA3AF', marginBottom:4, letterSpacing:'0.5px', textTransform:'uppercase' }}>Good morning</p>
-              <h1 style={{ fontSize:26, fontWeight:700, color:'#fff', marginBottom:6, letterSpacing:'-0.5px' }}>John Doe</h1>
+              <p style={{ fontSize:12, color:'#9CA3AF', marginBottom:4, letterSpacing:'0.5px', textTransform:'uppercase' }}>Hello</p>
+              <h1 style={{ fontSize:26, fontWeight:700, color:'#fff', marginBottom:6, letterSpacing:'-0.5px' }}>Welcome to VedaAI</h1>
               <p style={{ fontSize:14, color:'#6B7280', marginBottom:24, maxWidth:380 }}>Create AI-powered question papers for your classes in seconds.</p>
               <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
                 <Link href="/create" style={{ textDecoration:'none' }}>
