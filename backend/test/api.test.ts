@@ -67,12 +67,16 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
   const { allowedProviders, resolveOpenRouterModel, resolveOpenRouterModels, redactError, parseResponse } = await import('../src/services/aiGenerator');
   ok(resolveOpenRouterModel({ OPENROUTER_MODEL: 'google/gemma-4-31b-it:free' } as any) === 'google/gemma-4-31b-it:free' && resolveOpenRouterModel({} as any).endsWith(':free'), 'openrouter free model accepted/default is free');
   ok(resolveOpenRouterModels({ OPENROUTER_MODEL: 'a/b:free, c/d:free' } as any).length === 2 && resolveOpenRouterModels({ OPENROUTER_MODEL: 'a:free,b:free,c:free,d:free' } as any).length === 3, 'free model list capped at 3');
-  { const A: any = { subject: 'S', numberOfQuestions: 2, totalMarks: 4 };
+  { const A: any = { subject: 'S', numberOfQuestions: 2, totalMarks: 4, questionTypes: ['Multiple Choice Questions', 'Short Questions'] };
     const good = JSON.stringify({ sections: [{ title: 'A', questions: [{ text: 'Q1?', marks: 2, type: 'MCQ', difficulty: 'easy', options: ['a', 'b', 'c', 'd'], answer: 'b' }, { text: 'Q2?', marks: 2, type: 'Short', difficulty: 'easy', answer: 'x' }] }] });
     const g = parseResponse(good, A);
     ok(g.sections[0].questions[0].options?.length === 4 && g.sections[0].questions[0].answer === 'b' && g.totalMarks === 4, 'parse keeps MCQ options, answer, real marks total');
     assert.throws(() => parseResponse(good.replace('"options":["a","b","c","d"],', ''), A), /MCQ without answer choices/); n++;
     assert.throws(() => parseResponse(good, { ...A, numberOfQuestions: 3 }), /expected 3/); n++;
+    assert.throws(() => parseResponse(good.replace('"Short"', '"Long"'), A), /not requested/); n++;
+    assert.throws(() => parseResponse(good.replace('"answer":"b"', '"answer":"z"'), A), /not one of its options/); n++;
+    assert.throws(() => parseResponse(good, { ...A, totalMarks: 6 }), /expected 6/); n++;
+    assert.throws(() => parseResponse(good, { ...A, questionTypes: ['Multiple Choice Questions', 'Short Questions', 'Essay'] }), /Essay|essay/); n++;
   }
   assert.throws(() => resolveOpenRouterModels({ OPENROUTER_MODEL: 'a:free,paid/model' } as any)); n++;
   ok(!redactError('bad key sk-abcdefgh12345 Bearer xyz SECRETKEY', 'SECRETKEY').includes('SECRETKEY') && !redactError('x sk-abcdefgh12345').includes('sk-abcdefgh12345'), 'error redaction');
