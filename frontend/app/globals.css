@@ -212,3 +212,12 @@ input[type="number"] { -moz-appearance: textfield; }
   .stats-grid { grid-template-columns: 1fr 1fr !important; }
   .btn-lg     { padding: 10px 20px; font-size: 13px; }
 }
+
+.qgrid { grid-template-columns: 1fr 120px 100px 36px; }
+.mlabel { display: none; font-size: 11px; color: var(--gray-500); }
+@media (max-width: 520px) {
+  .qgrid { grid-template-columns: 1fr 1fr 32px; }
+  .qgrid > select { grid-column: 1 / -1; }
+  .qhead { display: none !important; }
+  .mlabel { display: inline; }
+}

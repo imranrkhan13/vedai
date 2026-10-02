@@ -20,7 +20,7 @@ RULES:
 - Total marks across ALL sections must equal exactly ${a.totalMarks}
 - Total questions across ALL sections must equal exactly ${a.numberOfQuestions}
 - Questions must be specific, academically rigorous, and about ${a.subject}
-- Each question must have: text, difficulty (easy|medium|hard), marks (number), type (string), answer (the correct answer or a short model answer)
+- Each question must have: text, difficulty (easy|medium|hard), marks (number), type (string), concept (2-4 words naming the single fact or skill it tests; every question needs a different concept), answer (the correct answer or a short model answer)
 - Every MCQ question MUST also have an "options" array of exactly 4 distinct answer choices (plain text, no A/B/C/D prefixes), and its "answer" must be exactly one of those options
 - Every question must test a different fact or skill; never ask about the same fact twice, even in different words
 - Use ONLY these question types, and use each at least once: ${a.questionTypes.join(', ')}. Set each question's "type" to the matching label (MCQ, Short, Long, Diagram, Numerical, True/False, Fill, Essay)
@@ -39,7 +39,7 @@ JSON schema:
       "instruction": "Attempt all questions. Each question carries N marks.",
       "totalMarks": number,
       "questions": [
-        { "text": "Full question text here", "difficulty": "easy", "marks": 1, "type": "MCQ", "options": ["choice 1", "choice 2", "choice 3", "choice 4"], "answer": "choice 2" }
+        { "text": "Full question text here", "difficulty": "easy", "marks": 1, "type": "MCQ", "concept": "organelle function", "options": ["choice 1", "choice 2", "choice 3", "choice 4"], "answer": "choice 2" }
       ]
     }
   ]
@@ -236,6 +236,11 @@ function validatePaper(sections: ISection[], a: IAssignment): void {
       const inter = [...ti].filter((w) => tj.has(w)).length;
       const union = new Set([...ti, ...tj]).size || 1;
       if (inter / union >= 0.7) throw new Error(`Questions ${i + 1} and ${j + 1} are near duplicates`);
+      const ci = toks(all[i].concept || ''), cj = toks(all[j].concept || '');
+      if (ci.size && cj.size) {
+        const cInter = [...ci].filter((w) => cj.has(w)).length;
+        if (cInter / (new Set([...ci, ...cj]).size || 1) >= 0.5) throw new Error(`Questions ${i + 1} and ${j + 1} test the same concept`);
+      }
     }
   }
   const marks = all.reduce((n, q) => n + q.marks, 0);
@@ -251,6 +256,7 @@ export function parseResponse(raw: string, a: IAssignment): IGeneratedOutput {
       const text = stripNul(String(q.text || '')).trim();
       if (!text) throw new Error('Model returned a question with no text');
       const out: IQuestion = { id: uuidv4(), text, difficulty: ['easy', 'medium', 'hard'].includes(q.difficulty) ? q.difficulty : 'medium', marks: Number(q.marks) || 1, type };
+      if (q.concept) out.concept = stripNul(String(q.concept)).trim().slice(0, 80);
       if (Array.isArray(q.options)) out.options = q.options.map((o: any) => stripNul(String(o)).trim()).filter(Boolean);
       if (q.answer !== undefined && q.answer !== null && String(q.answer).trim()) out.answer = stripNul(String(q.answer)).trim();
       if (canonicalType(type) === 'mcq' && (!out.options || out.options.length < 2)) throw new Error('Model returned an MCQ without answer choices');
