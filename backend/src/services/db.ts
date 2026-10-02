@@ -1,3 +1,4 @@
+import { redactSecrets } from './redact';
 import { Pool } from 'pg';
 
 // Minimal query interface so tests can inject an in-memory Postgres.
@@ -56,7 +57,7 @@ export async function connectDB() {
     await pool.query(SCHEMA_SQL);
     console.log('✅ Postgres connected');
   } catch (err) {
-    console.error('❌ Postgres connection error:', err);
+    console.error('❌ Postgres connection error:', redactSecrets(err));
     process.exit(1);
   }
 }
