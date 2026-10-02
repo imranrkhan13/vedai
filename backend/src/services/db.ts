@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS vedai_assignments (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE vedai_assignments ADD COLUMN IF NOT EXISTS question_plan JSONB;
 CREATE INDEX IF NOT EXISTS vedai_assignments_created_at_idx ON vedai_assignments (created_at DESC);
 `;
 
