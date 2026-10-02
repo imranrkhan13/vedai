@@ -3,6 +3,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { getRedis } from './redis';
 import Redis from 'ioredis';
+import { verifyToken } from './auth';
 
 const clients = new Map<string, WebSocket>();
 
@@ -11,7 +12,11 @@ export function initWebSocket(server: Server) {
 
   wss.on('connection', (ws, req) => {
     const url = new URL(req.url || '', 'http://localhost');
-    const clientId = url.searchParams.get('clientId') || Math.random().toString(36).slice(2);
+    // Only signed-in users may listen. Messages are routed to `<userId>:<clientId>`, so one user cannot receive another user's events.
+    const uid = verifyToken(url.searchParams.get('token') || '');
+    if (!uid) { ws.close(1008, 'unauthorized'); return; }
+    const shown = url.searchParams.get('clientId') || Math.random().toString(36).slice(2);
+    const clientId = `${uid}:${shown}`;
     clients.set(clientId, ws);
     console.log(`WS connected: ${clientId} (total: ${clients.size})`);
 
@@ -21,7 +26,7 @@ export function initWebSocket(server: Server) {
     });
 
     ws.on('error', () => clients.delete(clientId));
-    ws.send(JSON.stringify({ type: 'connected', clientId }));
+    ws.send(JSON.stringify({ type: 'connected', clientId: shown }));
   });
 
   // Redis pub/sub subscriber (separate connection from main client)
