@@ -40,11 +40,11 @@ function RubricGuide({ a, onSaved }:{ a:any; onSaved:()=>void }){
           {q.rubricEdited&&!edit[q.id]&&<p style={{ fontSize:11, color:'var(--gray-500)', marginBottom:6 }}>Edited by you.</p>}
           {q.evidence&&<p style={{ fontSize:11, color:'var(--gray-500)', fontStyle:'italic', marginBottom:6 }}>Source sentence the model says it used: &ldquo;{q.evidence}&rdquo;</p>}
           {get(q).map((l,i)=>(
-            <div key={i} style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
+            <div key={i} style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap' }}>
               <input className="input" type="number" min={0} max={q.marks} value={l.marks} onChange={e=>change(q,i,'marks',e.target.value)} style={{ width:64, height:34, fontSize:13 }} aria-label={`Marks for level ${i+1}`}/>
-              <div style={{ flex:1, minWidth:200, display:'flex', flexDirection:'column', gap:4 }}>
-                <textarea className="input" value={l.descriptor} onChange={e=>change(q,i,'descriptor',e.target.value)} style={{ minHeight:44, fontSize:12 }} aria-label={`Description for level ${i+1}`}/>
-                <textarea className="input" value={l.example} onChange={e=>change(q,i,'example',e.target.value)} style={{ minHeight:60, fontSize:12 }} aria-label={`Sample answer for level ${i+1}`}/>
+              <div style={{ flex:'1 1 240px', minWidth:0, display:'flex', flexDirection:'column', gap:4 }}>
+                <textarea className="input" value={l.descriptor} onChange={e=>change(q,i,'descriptor',e.target.value)} style={{ minHeight:84, fontSize:12 }} aria-label={`Description for level ${i+1}`}/>
+                <textarea className="input" value={l.example} onChange={e=>change(q,i,'example',e.target.value)} style={{ minHeight:120, fontSize:12 }} aria-label={`Sample answer for level ${i+1}`}/>
               </div>
             </div>
           ))}
@@ -69,6 +69,8 @@ export default function OutputPage() {
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+  const guideRef = useRef<HTMLDivElement>(null);
+  const [guideBusy,setGuideBusy] = useState(false);
   const pollRef = useRef<NodeJS.Timeout|null>(null);
 
   useEffect(()=>{ if(typeof window!=='undefined') initWebSocket(); fetchAssignment(id).finally(()=>setLoading(false)); },[id]);
@@ -91,6 +93,18 @@ export default function OutputPage() {
       toast.success('PDF downloaded!');
     } catch { toast.error('PDF failed'); }
     finally { setDownloading(false); }
+  };
+
+  const handleGuideDownload = async () => {
+    if(!guideRef.current) return;
+    setGuideBusy(true);
+    toast('Preparing teacher guide...');
+    try {
+      const html2pdf = (await import('html2pdf.js')).default;
+      await html2pdf().set({ margin:[12,12,12,12], filename:`${currentAssignment?.title||'question-paper'} - teacher guide.pdf`, html2canvas:{ scale:2, useCORS:true, logging:false }, pagebreak:{ mode:['css','legacy'], avoid:['.avoid-break'] }, jsPDF:{ unit:'mm', format:'a4', orientation:'portrait' } } as any).from(guideRef.current).save();
+      toast.success('Teacher guide downloaded!');
+    } catch { toast.error('PDF failed'); }
+    finally { setGuideBusy(false); }
   };
 
   const handleCopy = async () => {
@@ -265,8 +279,8 @@ export default function OutputPage() {
                     <p style={{ fontSize:13, fontWeight:700, color:'var(--black)' }}>End of Question Paper</p>
                   </div>
                   {a.output.sections.some((sec:Section)=>sec.questions.some((q:Question)=>q.answer))&&(
-                  <div style={{ padding:'20px 0', borderTop:'2px solid var(--black)' }}>
-                    <h3 style={{ fontSize:14, fontWeight:700, color:'var(--black)', marginBottom:14 }}>Answer Key:</h3>
+                  <div data-html2canvas-ignore="true" style={{ padding:'20px 0', borderTop:'2px solid var(--black)' }}>
+                    <h3 style={{ fontSize:14, fontWeight:700, color:'var(--black)', marginBottom:14 }}>Answer Key (teacher only, not in the student PDF):</h3>
                     <ol style={{ listStyle:'none', padding:0 }}>
                       {a.output.sections.flatMap((sec:Section)=>sec.questions).map((q:Question,i:number)=>q.answer?(
                         <li key={i} style={{ display:'flex', gap:8, marginBottom:8, fontSize:13, lineHeight:1.6 }}>
@@ -279,6 +293,34 @@ export default function OutputPage() {
                     </ol>
                   </div>
                   )}
+                </div>
+              </div>
+
+              <div className="card fade-up" style={{ padding:'14px 20px', marginTop:14, maxWidth:760, display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
+                <div style={{ flex:'1 1 260px' }}>
+                  <p style={{ fontSize:13, fontWeight:600, color:'var(--black)' }}>Teacher answer guide (separate PDF)</p>
+                  <p style={{ fontSize:11, color:'var(--gray-500)', lineHeight:1.5 }}>Answers, source sentences the model named, and marking levels. AI draft: check it before using. The student PDF does not include any of this.</p>
+                </div>
+                <button className="btn btn-ghost" onClick={handleGuideDownload} disabled={guideBusy} style={{ fontSize:12 }}>{guideBusy?<Loader2 size={12} className="spin"/>:<Download size={12}/>} Download guide PDF</button>
+              </div>
+              <div style={{ position:'absolute', left:-10000, top:0, width:700 }} aria-hidden="true">
+                <div ref={guideRef} style={{ background:'#fff', color:'#111', padding:'8px 4px', fontSize:12, lineHeight:1.5 }}>
+                  <h2 style={{ fontSize:16, fontWeight:700, textAlign:'center', marginBottom:2 }}>{a.title} - Teacher answer guide</h2>
+                  <p style={{ fontSize:10, textAlign:'center', color:'#555', marginBottom:12 }}>AI draft for teacher review. Sample answers are illustrations, not student work. The teacher decides final marks.</p>
+                  {(a.output.sections as Section[]).flatMap((sec:Section)=>sec.questions).map((q:Question,i:number)=>(
+                    <div key={q.id||i} className="avoid-break" style={{ marginBottom:12, breakInside:'avoid', pageBreakInside:'avoid' }}>
+                      <p style={{ fontWeight:700 }}>{i+1}. {q.text} <span style={{ fontWeight:400 }}>[{q.marks} mark{q.marks>1?'s':''}]</span></p>
+                      {q.options&&q.options.length>0&&<p style={{ color:'#444' }}>{q.options.map((o:string,oi:number)=>`(${String.fromCharCode(97+oi)}) ${o}`).join('   ')}</p>}
+                      {q.answer&&<p><b>Answer:</b> {q.answer}</p>}
+                      {q.evidence&&<p style={{ fontSize:10, color:'#555', fontStyle:'italic' }}>Sentence the model says it used (found in the notes, not proof): &ldquo;{q.evidence}&rdquo;</p>}
+                      {q.rubric&&q.rubric.length===3&&(
+                        <div style={{ marginTop:4 }}>
+                          <p style={{ fontWeight:600 }}>Marking levels{q.rubricEdited?' (edited by teacher)':' (AI draft)'}:</p>
+                          {q.rubric.map((l,li)=>(<p key={li} style={{ marginLeft:8 }}><b>{l.marks} / {q.marks}:</b> {l.descriptor} <i>Sample answer: {l.example}</i></p>))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
 
