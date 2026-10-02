@@ -27,7 +27,7 @@ export default function LoginPage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <form onSubmit={submit} className="card" style={{ width: '100%', maxWidth: 380, padding: 28 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Quillix</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Ques-AI</h1>
         <p style={{ fontSize: 13, color: 'var(--gray-500)', marginBottom: 20 }}>
           {mode === 'login' ? 'Sign in to see your assignments.' : 'Create a free teacher account. Your papers stay private to you.'}
         </p>
