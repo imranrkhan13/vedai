@@ -183,3 +183,5 @@ Question paper rendered        ← structured sections, difficulty badges, marks
 | Realtime | ws (WebSocket) | Per-client channels, lightweight |
 | AI | Multi-provider fallback | No single point of failure, free tiers |
 | PDF | html2pdf.js | Client-side, no server dependency |
+
+<!-- deploy trigger 1790950676 -->
