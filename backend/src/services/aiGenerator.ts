@@ -22,7 +22,8 @@ RULES:
 - Questions must be specific, academically rigorous, and about ${a.subject}
 - Each question must have: text, difficulty (easy|medium|hard), marks (number), type (string), answer (the correct answer or a short model answer)
 - Every MCQ question MUST also have an "options" array of exactly 4 distinct answer choices (plain text, no A/B/C/D prefixes), and its "answer" must be exactly one of those options
-- Use only the requested question types
+- Use ONLY these question types, and use each at least once: ${a.questionTypes.join(', ')}. Set each question's "type" to the matching label (MCQ, Short, Long, Diagram, Numerical, True/False, Fill, Essay)
+- Question marks must add up to exactly ${a.totalMarks}
 - Group into logical sections: Section A = short/MCQ (1-2 marks), Section B = medium (3-5 marks), Section C = long (5-10 marks)
 
 JSON schema:
@@ -184,6 +185,43 @@ async function callWithFallback(prompt: string): Promise<string | null> {
 }
 
 // ── Parse LLM response ──────────────────────────────────────────────────────
+
+// Maps a model-returned (or requested) type label onto a canonical kind so the paper can be checked against the request.
+export function canonicalType(t: string): string {
+  const x = String(t).toLowerCase();
+  if (/true\s*\/?\s*false|true or false/.test(x)) return 'truefalse';
+  if (/mcq|multiple/.test(x)) return 'mcq';
+  if (/fill/.test(x)) return 'fill';
+  if (/diagram|graph/.test(x)) return 'diagram';
+  if (/numer/.test(x)) return 'numerical';
+  if (/essay/.test(x)) return 'essay';
+  if (/long/.test(x)) return 'long';
+  if (/short/.test(x)) return 'short';
+  return x.trim();
+}
+
+function validatePaper(sections: ISection[], a: IAssignment): void {
+  const all = sections.flatMap((sec) => sec.questions);
+  if (all.length !== a.numberOfQuestions) throw new Error(`Model returned ${all.length} questions, expected ${a.numberOfQuestions}`);
+  const requested = new Set(a.questionTypes.map(canonicalType));
+  const seen = new Set<string>();
+  all.forEach((q, i) => {
+    const kind = canonicalType(q.type);
+    if (!requested.has(kind)) throw new Error(`Question ${i + 1} has type "${q.type}" which was not requested`);
+    seen.add(kind);
+    if (kind === 'mcq') {
+      if (!q.options || q.options.length !== 4) throw new Error(`MCQ ${i + 1} must have exactly 4 options`);
+      const norm = (v: string) => v.trim().toLowerCase();
+      if (new Set(q.options.map(norm)).size !== 4) throw new Error(`MCQ ${i + 1} has duplicate options`);
+      if (!q.answer || !q.options.some((o) => norm(o) === norm(q.answer as string))) throw new Error(`MCQ ${i + 1} answer is not one of its options`);
+    }
+    if (kind === 'truefalse' && !/^(true|false)\b/i.test(q.answer || '')) throw new Error(`True/False question ${i + 1} needs a True or False answer`);
+  });
+  for (const k of requested) if (!seen.has(k)) throw new Error(`No question of requested type "${k}" was returned`);
+  const marks = all.reduce((n, q) => n + q.marks, 0);
+  if (marks !== a.totalMarks) throw new Error(`Questions add up to ${marks} marks, expected ${a.totalMarks}`);
+}
+
 export function parseResponse(raw: string, a: IAssignment): IGeneratedOutput {
   const cleaned = raw.replace(/```json\n?|```\n?/g, '').trim();
   const parsed = JSON.parse(cleaned);
@@ -195,13 +233,12 @@ export function parseResponse(raw: string, a: IAssignment): IGeneratedOutput {
       const out: IQuestion = { id: uuidv4(), text, difficulty: ['easy', 'medium', 'hard'].includes(q.difficulty) ? q.difficulty : 'medium', marks: Number(q.marks) || 1, type };
       if (Array.isArray(q.options)) out.options = q.options.map((o: any) => stripNul(String(o)).trim()).filter(Boolean);
       if (q.answer !== undefined && q.answer !== null && String(q.answer).trim()) out.answer = stripNul(String(q.answer)).trim();
-      if (/mcq|multiple/i.test(type) && (!out.options || out.options.length < 2)) throw new Error('Model returned an MCQ without answer choices');
+      if (canonicalType(type) === 'mcq' && (!out.options || out.options.length < 2)) throw new Error('Model returned an MCQ without answer choices');
       return out;
     });
     return { title: sec.title || 'Section', instruction: sec.instruction || 'Attempt all questions.', questions, totalMarks: questions.reduce((s, q) => s + q.marks, 0) };
   });
-  const total = sections.reduce((n, sec) => n + sec.questions.length, 0);
-  if (total !== a.numberOfQuestions) throw new Error(`Model returned ${total} questions, expected ${a.numberOfQuestions}`);
+  validatePaper(sections, a);
   return { subject: parsed.subject || a.subject, totalMarks: sections.reduce((n, sec) => n + sec.totalMarks, 0), duration: parsed.duration || '2 hours', grade: parsed.grade || '', sections, generatedAt: new Date() };
 }
 
