@@ -70,10 +70,40 @@ export default function CreatePage() {
     return out.replace(/\0/g,'').trim();
   };
 
+  const readImageText = async (file:File) => {
+    // Text is read inside the browser with Tesseract (loaded from a pinned CDN version). The image is not uploaded to our server.
+    let T: any;
+    const url = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.esm.min.js';
+    try { T = await import(/* webpackIgnore: true */ url); }
+    catch { throw new Error('OCR_LOADER'); }
+    const worker = await (T.createWorker || T.default.createWorker)('eng');
+    try {
+      const r = await worker.recognize(file);
+      return String(r.data.text||'').replace(/\0/g,'').trim();
+    } finally { await worker.terminate(); }
+  };
+
   const readFile = async (file:File) => {
     const isPdf = /\.pdf$/i.test(file.name);
-    if(!isPdf && !/\.txt$/i.test(file.name)){ toast.error('Only .txt and text-based .pdf files are supported (images and scanned PDFs cannot be read)'); return; }
+    const isImg = /\.(png|jpe?g|webp)$/i.test(file.name) || /^image\/(png|jpeg|webp)$/.test(file.type);
+    if(!isPdf && !isImg && !/\.txt$/i.test(file.name)){ toast.error('Supported files: .txt, text-based .pdf, or a PNG/JPG/WebP image of printed text'); return; }
     if(file.size>10*1024*1024){ toast.error('Max 10MB'); return; }
+    if(isImg){
+      const t = toast.loading('Reading text from the image...');
+      try {
+        const text = await readImageText(file);
+        toast.dismiss(t);
+        if(text.length<20){ toast.error('Could not find readable printed text in this image. Try a clearer, straighter photo.'); return; }
+        setFileName(file.name); setFileContent(text);
+        toast.success('Text read from the image.');
+      } catch(err:unknown) {
+        toast.dismiss(t);
+        toast.error(err instanceof Error && err.message==='OCR_LOADER'
+          ? 'The image reader could not be loaded (it needs access to cdn.jsdelivr.net). Check your connection or use a .txt file.'
+          : 'This image could not be read. Try another image.');
+      }
+      return;
+    }
     if(isPdf){
       try {
         const text = await readPdfText(file);
@@ -147,7 +177,7 @@ export default function CreatePage() {
             <h2 style={{ fontSize:14, fontWeight:600, marginBottom:3, color:'var(--black)' }}>Assignment Details</h2>
             <p style={{ fontSize:12, color:'var(--gray-400)', marginBottom:18 }}>Basic information about your assignment</p>
 
-            <input ref={fileRef} type="file" accept=".txt,.pdf,text/plain,application/pdf" style={{ display:'none' }} onChange={e=>e.target.files?.[0]&&readFile(e.target.files[0])}/>
+            <input ref={fileRef} type="file" accept=".txt,.pdf,.png,.jpg,.jpeg,.webp,text/plain,application/pdf,image/png,image/jpeg,image/webp" style={{ display:'none' }} onChange={e=>e.target.files?.[0]&&readFile(e.target.files[0])}/>
             {!fileName?(
               <div onClick={()=>fileRef.current?.click()}
                 onDragOver={e=>{e.preventDefault();setDragOver(true);}}
