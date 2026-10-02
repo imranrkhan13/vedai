@@ -13,7 +13,7 @@ Total Marks: ${a.totalMarks}
 Question Types: ${a.questionTypes.join(', ')}
 ${a.questionPlan ? `Exact plan (follow it exactly):\n${a.questionPlan.map((r) => `  - ${r.qty} question(s) of type "${r.type}", each worth exactly ${r.marks} mark(s)`).join('\n')}\n` : ''}Difficulty: ${a.difficulty === 'mixed' ? 'Mix — 30% easy, 50% medium, 20% hard' : a.difficulty}
 ${a.additionalInstructions ? `Special Instructions: ${a.additionalInstructions}` : ''}
-${a.fileContent ? `Source text. STRICT: every question and answer must be answerable from this text only. Do not add facts, topics or general knowledge that are not in it. If the text is too short for the requested count, still return the count but keep each question tightly tied to a different sentence of the source, and put the exact source sentence it is based on at the start of the answer after 'Source: ':\n${a.fileContent.slice(0, 2000)}` : ''}
+${a.fileContent ? `Source text. STRICT: every question and answer must be answerable from this text only. Do not add facts, topics or general knowledge that are not in it. Give every question a "source" field containing one sentence copied word for word from this text that the question is based on (empty string if none exists). Do not invent questions beyond the text:\n${a.fileContent.slice(0, 2000)}` : ''}
 
 RULES:
 - Return ONLY a JSON object, no markdown fences, no explanation
@@ -256,6 +256,11 @@ export function parseResponse(raw: string, a: IAssignment): IGeneratedOutput {
       const text = stripNul(String(q.text || '')).trim();
       if (!text) throw new Error('Model returned a question with no text');
       const out: IQuestion = { id: uuidv4(), text, difficulty: ['easy', 'medium', 'hard'].includes(q.difficulty) ? q.difficulty : 'medium', marks: Number(q.marks) || 1, type };
+      if (a.fileContent && typeof q.source === 'string') {
+        const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+        const quote = stripNul(q.source).trim().slice(0, 240);
+        if (norm(quote).length >= 15 && norm(a.fileContent.slice(0, 2000)).includes(norm(quote))) out.evidence = quote;
+      }
       if (q.concept) out.concept = stripNul(String(q.concept)).trim().slice(0, 80);
       if (Array.isArray(q.options)) out.options = q.options.map((o: any) => stripNul(String(o)).trim()).filter(Boolean);
       if (q.answer !== undefined && q.answer !== null && String(q.answer).trim()) out.answer = stripNul(String(q.answer)).trim();
@@ -509,4 +514,4 @@ export async function generateQuestionPaper(a: IAssignment): Promise<IGeneratedO
     return { ...mock, schoolName: 'SAMPLE PAPER (not AI-generated)' };
   }
   throw new Error(rejected ? `Generated paper rejected: ${rejected}` : 'All AI providers failed or are not configured');
-          }
+}
