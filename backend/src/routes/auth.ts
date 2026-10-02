@@ -31,7 +31,7 @@ router.post('/register', async (req: Request, res: Response) => {
       [p.data.email, hashPassword(p.data.password)]
     );
     if (!rows[0]) return res.status(409).json({ success: false, error: 'That email is already registered' });
-    setSession(res, rows[0].id);
+    setSession(req, res, rows[0].id);
     return res.status(201).json({ success: true, data: { user: { id: rows[0].id, email: rows[0].email } } });
   } catch { return res.status(500).json({ success: false, error: 'Could not register' }); }
 });
@@ -44,12 +44,12 @@ router.post('/login', async (req: Request, res: Response) => {
     const { rows } = await getDb().query('SELECT id, email, password_hash FROM vedai_users WHERE email=$1', [p.data.email]);
     const u = rows[0];
     if (!u || !verifyPassword(p.data.password, u.password_hash)) return res.status(401).json({ success: false, error: 'Wrong email or password' });
-    setSession(res, u.id);
+    setSession(req, res, u.id);
     return res.json({ success: true, data: { user: { id: u.id, email: u.email } } });
   } catch { return res.status(500).json({ success: false, error: 'Could not sign in' }); }
 });
 
-router.post('/logout', (req: Request, res: Response) => { clearSession(res); res.json({ success: true, data: {} }); });
+router.post('/logout', (req: Request, res: Response) => { clearSession(req, res); res.json({ success: true, data: {} }); });
 
 // Short-lived ticket so the browser can open the WebSocket (a cookie is not sent to the API host).
 router.get('/ws-ticket', requireAuth, (req: Request, res: Response) => res.json({ success: true, data: { ticket: signToken(req.userId!, 60, 'ws') } }));
