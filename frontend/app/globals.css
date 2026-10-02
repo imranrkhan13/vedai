@@ -227,7 +227,6 @@ input[type="number"] { -moz-appearance: textfield; }
   .topbar span { white-space: nowrap; }
   .topbar .btn-sm { padding-left: 9px; padding-right: 9px; font-size: 12px; gap: 4px; flex-shrink: 0; }
   .topbar > div { gap: 4px !important; flex-wrap: wrap; }
-  .topbar .btn-sm svg { display: none; }
   .main-content [style*="48px"] { padding-left: 16px !important; padding-right: 16px !important; }
   .main-content [style*="48px"] input { width: auto !important; flex: 1; min-width: 0; }
 }
