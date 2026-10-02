@@ -8,7 +8,7 @@
 ```
 vedaai/
 ├── README.md                          ← You are here
-├── docker-compose.yml                 ← Spins up MongoDB + Redis locally
+├── docker-compose.yml                 ← Spins up Postgres + Redis locally
 │
 ├── backend/                           ← Node.js + Express + TypeScript API
 │   ├── src/
@@ -16,7 +16,7 @@ vedaai/
 │   │   ├── worker.ts                  ← BullMQ worker (run as SEPARATE process)
 │   │   │
 │   │   ├── models/
-│   │   │   └── Assignment.ts          ← Mongoose schema: Assignment, Section, Question
+│   │   │   └── Assignment.ts          ← Postgres model + queries (assignments table, JSONB output)
 │   │   │
 │   │   ├── routes/
 │   │   │   ├── assignments.ts         ← REST CRUD: GET/POST/DELETE + /regenerate
@@ -24,7 +24,7 @@ vedaai/
 │   │   │
 │   │   └── services/
 │   │       ├── aiGenerator.ts         ← AI fallback chain (Gemini→OpenRouter→Mistral→Cohere→Groq)
-│   │       ├── db.ts                  ← MongoDB connection (Mongoose)
+│   │       ├── db.ts                  ← Postgres connection (pg, Neon-compatible)
 │   │       ├── queue.ts               ← BullMQ Queue factory
 │   │       ├── redis.ts               ← ioredis singleton
 │   │       └── websocket.ts           ← WS server: per-client channels, notifyClient()
@@ -57,7 +57,7 @@ vedaai/
 
 ## 🚀 How to Run (5 minutes)
 
-### Step 1 – Start MongoDB + Redis
+### Step 1 – Start Postgres + Redis
 ```bash
 docker-compose up -d
 ```
@@ -66,6 +66,7 @@ docker-compose up -d
 ```bash
 cd backend
 npm install
+export DATABASE_URL=postgres://postgres:postgres@localhost:5432/vedaai
 npm start          # runs ts-node src/index.ts on :5000
 ```
 
@@ -93,7 +94,7 @@ Open **http://localhost:3000**
 ```
 Teacher fills form
        ↓
-POST /api/assignments          → MongoDB doc created (status: pending)
+POST /api/assignments          → Postgres row created (status: pending)
        ↓
 BullMQ job enqueued            → jobId returned to frontend
        ↓
@@ -108,7 +109,7 @@ aiGenerator.ts tries providers:
   4. Cohere command-r-plus
   5. Groq llama-3.1-8b
        ↓
-JSON parsed + validated        → stored in MongoDB
+JSON parsed + validated        → stored in Postgres
        ↓
 WebSocket notifies frontend    → status: completed
        ↓
@@ -149,7 +150,7 @@ Question paper rendered        ← structured sections, difficulty badges, marks
 - [x] Zustand state management + WebSocket
 - [x] AI question generation (structured prompt → JSON schema → parse → store)
 - [x] Sections (A/B/C), difficulty distribution, marks per question
-- [x] MongoDB for assignments + results
+- [x] Postgres (Neon) for assignments + results
 - [x] Redis for caching completed assignments
 - [x] BullMQ for background jobs
 - [x] WebSocket real-time progress updates
@@ -176,10 +177,9 @@ Question paper rendered        ← structured sections, difficulty badges, marks
 | Frontend | Next.js 14 App Router + TypeScript | SSR, file-based routing, React Server Components |
 | State | Zustand | Lightweight, no boilerplate, WebSocket integration easy |
 | Backend | Express + TypeScript | Familiar, minimal overhead |
-| Database | MongoDB + Mongoose | Flexible schema for nested output |
+| Database | Postgres (Neon) + pg | JSONB for nested output |
 | Cache | Redis + ioredis | Fast completed-assignment lookups |
 | Queue | BullMQ | Built on Redis, retry logic, job state tracking |
 | Realtime | ws (WebSocket) | Per-client channels, lightweight |
 | AI | Multi-provider fallback | No single point of failure, free tiers |
 | PDF | html2pdf.js | Client-side, no server dependency |
-
