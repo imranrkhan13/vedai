@@ -11,7 +11,7 @@ Title: ${a.title}
 Total Questions: ${a.numberOfQuestions}
 Total Marks: ${a.totalMarks}
 Question Types: ${a.questionTypes.join(', ')}
-Difficulty: ${a.difficulty === 'mixed' ? 'Mix — 30% easy, 50% medium, 20% hard' : a.difficulty}
+${a.questionPlan ? `Exact plan (follow it exactly):\n${a.questionPlan.map((r) => `  - ${r.qty} question(s) of type "${r.type}", each worth exactly ${r.marks} mark(s)`).join('\n')}\n` : ''}Difficulty: ${a.difficulty === 'mixed' ? 'Mix — 30% easy, 50% medium, 20% hard' : a.difficulty}
 ${a.additionalInstructions ? `Special Instructions: ${a.additionalInstructions}` : ''}
 ${a.fileContent ? `Reference Content (use this to frame questions):\n${a.fileContent.slice(0, 2000)}` : ''}
 
@@ -218,6 +218,15 @@ function validatePaper(sections: ISection[], a: IAssignment): void {
     if (kind === 'truefalse' && !/^(true|false)\b/i.test(q.answer || '')) throw new Error(`True/False question ${i + 1} needs a True or False answer`);
   });
   for (const k of requested) if (!seen.has(k)) throw new Error(`No question of requested type "${k}" was returned`);
+  if (a.questionPlan) {
+    for (const row of a.questionPlan) {
+      const kind = canonicalType(row.type);
+      const got = all.filter((q) => canonicalType(q.type) === kind);
+      if (got.length !== row.qty) throw new Error(`Expected ${row.qty} "${row.type}" questions, got ${got.length}`);
+      const bad = got.find((q) => q.marks !== row.marks);
+      if (bad) throw new Error(`A "${row.type}" question is worth ${bad.marks} marks, expected ${row.marks}`);
+    }
+  }
   const marks = all.reduce((n, q) => n + q.marks, 0);
   if (marks !== a.totalMarks) throw new Error(`Questions add up to ${marks} marks, expected ${a.totalMarks}`);
 }
