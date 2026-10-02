@@ -32,7 +32,7 @@ app.use(cors({
     // Allow requests with no origin (mobile apps, curl, Render health checks)
     if (!origin) return callback(null, true);
     // Allow any vercel.app domain for this project
-    if (origin.includes('vedai') || origin.includes('localhost') || allowedOrigins.includes(origin)) {
+    if (/^https:\/\/vedai[a-z0-9-]*\.vercel\.app$/.test(origin) || /^http:\/\/localhost(:\d+)?$/.test(origin) || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     callback(new Error(`CORS blocked: ${origin}`));
@@ -41,6 +41,22 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: '10mb' }));
+
+// Protect the free-model daily cap: limit generation requests per IP (in memory, no new dependency)
+const genHits = new Map<string, number[]>();
+app.use((req, res, next) => {
+  const isGen = req.method === 'POST' && /^\/api\/assignments(\/[^/]+\/regenerate)?\/?$/.test(req.path);
+  if (!isGen) return next();
+  const ip = String(req.headers['x-forwarded-for'] || req.ip || '').split(',').pop()!.trim();
+  const now = Date.now();
+  const hits = (genHits.get(ip) || []).filter((t) => now - t < 3600_000);
+  if (hits.length >= Number(process.env.GEN_LIMIT_PER_HOUR || 10)) {
+    return res.status(429).json({ success: false, error: 'Too many generation requests. Try again later.' });
+  }
+  hits.push(now);
+  genHits.set(ip, hits);
+  next();
+});
 
 // Routes
 app.use('/api/assignments', assignmentRoutes);
