@@ -59,13 +59,21 @@ async function tryGemini(prompt: string): Promise<string> {
   return text;
 }
 
+// Spend guard: only OpenRouter models whose id ends in ":free" are ever requested.
+export function resolveOpenRouterModel(env: NodeJS.ProcessEnv = process.env): string {
+  const model = (env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free').trim();
+  if (!model.endsWith(':free')) throw new Error('OpenRouter model is not a :free model; blocked');
+  return model;
+}
+
 async function tryOpenRouter(prompt: string): Promise<string> {
+  const model = resolveOpenRouterModel();
   const key = process.env.OPENROUTER_API_KEY;
   if (!key || key.includes('your_')) throw new Error('No OpenRouter key');
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'HTTP-Referer': 'https://vedaai.app', 'X-Title': 'VedaAI' },
-    body: JSON.stringify({ model: 'meta-llama/llama-3.3-70b-instruct:free', messages: [{ role: 'user', content: prompt }], max_tokens: 4096, temperature: 0.4 }),
+    body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 4096, temperature: 0.4 }),
   });
   if (!res.ok) throw new Error(`OpenRouter ${res.status}`);
   const data = await res.json() as any;
@@ -397,6 +405,12 @@ export async function generateQuestionPaper(a: IAssignment): Promise<IGeneratedO
     }
   }
 
-  console.log('[AI] Using high-quality mock generator');
-  return buildMockOutput(a);
+  // Fail honestly by default. Demo mode (ALLOW_MOCK_OUTPUT=true) keeps the old sample paper,
+  // clearly labelled so it cannot be mistaken for AI output.
+  if (process.env.ALLOW_MOCK_OUTPUT === 'true') {
+    console.log('[AI] ALLOW_MOCK_OUTPUT=true: returning labelled sample paper');
+    const mock = buildMockOutput(a);
+    return { ...mock, schoolName: 'SAMPLE PAPER (not AI-generated)' };
+  }
+  throw new Error('All AI providers failed or are not configured');
 }
