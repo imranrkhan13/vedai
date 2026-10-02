@@ -204,7 +204,7 @@ export default function OutputPage() {
                               <span style={{ color:'var(--gray-500)' }}>[{DIFF_LABEL[q.difficulty]||q.difficulty}] </span>
                               {q.text}
                               <span style={{ fontWeight:600, color:'var(--gray-700)' }}> [{q.marks} Mark{q.marks>1?'s':''}]</span>
-                              {(a as any).fileContent&&(<div data-html2canvas-ignore="true" style={{ marginTop:6, fontSize:11, color:'var(--gray-500)', fontStyle:'italic' }}>{q.evidence?<>Source sentence this question is based on (matched to your text): &ldquo;{q.evidence}&rdquo;</>:<>Review: no sentence from your source was matched to this question. Please check it yourself. (Text-match check only, not a judgment of correctness.)</>}</div>)}
+                              {(a as any).fileContent&&(<div data-html2canvas-ignore="true" style={{ marginTop:6, fontSize:11, color:'var(--gray-500)', fontStyle:'italic' }}>{q.evidence?<>Sentence the model says it used (found word for word in your text; this does not prove the question follows from it): &ldquo;{q.evidence}&rdquo;</>:<>Review: no sentence from your source was matched to this question. Please check it yourself. (Copy check only, not a judgment of correctness.)</>}</div>)}
                               {q.options&&q.options.length>0&&(
                                 <ol style={{ listStyle:'none', padding:0, margin:'6px 0 0' }}>
                                   {q.options.map((o:string,oi:number)=>(<li key={oi} style={{ marginBottom:2 }}>({String.fromCharCode(97+oi)}) {o}</li>))}
