@@ -7,6 +7,8 @@ export interface Question {
   difficulty: Difficulty;
   marks: number;
   type: string;
+  options?: string[];
+  answer?: string;
 }
 
 export interface Section {
