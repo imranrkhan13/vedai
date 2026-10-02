@@ -3,8 +3,10 @@ import { z } from 'zod';
 import { Assignment } from '../models/Assignment';
 import { getAssignmentQueue } from '../services/queue';
 import { getRedis } from '../services/redis';
+import { requireAuth } from '../services/auth';
 
 const router = Router();
+router.use(requireAuth);
 
 const CreateAssignmentSchema = z.object({
   title: z.string().min(1),
@@ -20,9 +22,9 @@ const CreateAssignmentSchema = z.object({
   clientId: z.string().optional(),
 });
 
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
-    const assignments = await Assignment.list();
+    const assignments = await Assignment.list(req.userId!);
     res.json({ success: true, data: assignments });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch assignments' });
@@ -31,6 +33,9 @@ router.get('/', async (_req: Request, res: Response) => {
 
 router.get('/:id', async (req: Request, res: Response) => {
   try {
+    // Ownership check first: the cache is keyed by id only.
+    const own = await Assignment.findById(req.params.id as string, req.userId!);
+    if (!own) return res.status(404).json({ success: false, error: 'Not found' });
     const redis = getRedis();
     const cached = await redis.get(`assignment:${req.params.id}`);
     if (cached) return res.json({ success: true, data: JSON.parse(cached), cached: true });
@@ -66,7 +71,7 @@ router.post('/', async (req: Request, res: Response) => {
     if (Number.isNaN(dueDate.getTime())) {
       return res.status(400).json({ success: false, error: 'Validation failed', details: [{ path: ['dueDate'], message: 'Invalid date' }] });
     }
-    const assignment = await Assignment.create({ ...data, dueDate });
+    const assignment = await Assignment.create({ ...data, dueDate }, req.userId!);
 
     const queue = getAssignmentQueue();
     const job = await queue.add('generate', { assignmentId: assignment._id, clientId: data.clientId });
@@ -81,7 +86,7 @@ router.post('/', async (req: Request, res: Response) => {
 
 router.post('/:id/regenerate', async (req: Request, res: Response) => {
   try {
-    const assignment = await Assignment.findById(req.params.id);
+    const assignment = await Assignment.findById(req.params.id as string, req.userId!);
     if (!assignment) return res.status(404).json({ success: false, error: 'Not found' });
 
     await Assignment.resetForRegenerate(assignment._id);
@@ -101,7 +106,8 @@ router.post('/:id/regenerate', async (req: Request, res: Response) => {
 
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    await Assignment.deleteById(req.params.id as string);
+    const removed = await Assignment.deleteById(req.params.id as string, req.userId!);
+    if (!removed) return res.status(404).json({ success: false, error: 'Not found' });
     await getRedis().del(`assignment:${req.params.id}`);
     return res.json({ success: true });
   } catch {
