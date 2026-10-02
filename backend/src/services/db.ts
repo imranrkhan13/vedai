@@ -38,6 +38,14 @@ CREATE TABLE IF NOT EXISTS vedai_assignments (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE vedai_assignments ADD COLUMN IF NOT EXISTS question_plan JSONB;
+ALTER TABLE vedai_assignments ADD COLUMN IF NOT EXISTS owner_id TEXT;
+CREATE INDEX IF NOT EXISTS vedai_assignments_owner_idx ON vedai_assignments (owner_id);
+CREATE TABLE IF NOT EXISTS vedai_users (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 CREATE INDEX IF NOT EXISTS vedai_assignments_created_at_idx ON vedai_assignments (created_at DESC);
 `;
 
