@@ -108,6 +108,37 @@ router.post('/:id/regenerate', async (req: Request, res: Response) => {
   }
 });
 
+const RubricEditSchema = z.object({
+  questionId: z.string().min(1).max(100),
+  levels: z.array(z.object({
+    marks: z.number().int().min(0).max(500),
+    descriptor: z.string().trim().min(1).max(500),
+    example: z.string().trim().min(1).max(700),
+  })).length(3),
+});
+
+router.patch('/:id/rubric', async (req: Request, res: Response) => {
+  try {
+    const parsed = RubricEditSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ success: false, error: 'Each of the 3 levels needs whole-number marks, a description and an example.' });
+    const a = await Assignment.findById(req.params.id as string, req.userId!);
+    if (!a || a.status !== 'completed' || !a.output) return res.status(404).json({ success: false, error: 'Not found' });
+    const q = a.output.sections.flatMap((sec) => sec.questions).find((x) => x.id === parsed.data.questionId);
+    if (!q) return res.status(404).json({ success: false, error: 'Question not found' });
+    const lv = parsed.data.levels;
+    if (lv.some((l) => l.marks > q.marks)) return res.status(400).json({ success: false, error: 'A level cannot give more than the question maximum of ' + q.marks + ' marks.' });
+    if (!(lv[0].marks > lv[1].marks && lv[1].marks > lv[2].marks)) return res.status(400).json({ success: false, error: 'Levels must go from higher to lower marks.' });
+    q.rubric = lv;
+    q.rubricEdited = true;
+    const ok = await Assignment.setOutputForOwner(a._id, req.userId!, a.output);
+    if (!ok) return res.status(404).json({ success: false, error: 'Not found' });
+    await getRedis().del(`assignment:${req.params.id}`);
+    return res.json({ success: true, data: { questionId: q.id, rubric: q.rubric } });
+  } catch {
+    return res.status(500).json({ success: false, error: 'Failed to save' });
+  }
+});
+
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const removed = await Assignment.deleteById(req.params.id as string, req.userId!);
