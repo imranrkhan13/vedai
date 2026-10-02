@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Assignment, WSMessage } from '@/types';
-import { api } from '@/lib/api';
+import { api, auth } from '@/lib/api';
 
 interface JobProgress {
   status: string;
@@ -65,7 +65,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
     let ws: WebSocket;
     try {
-      ws = new WebSocket(`${wsUrl}?clientId=${clientId}`);
+      ws = new WebSocket(`${wsUrl}?clientId=${clientId}&token=${encodeURIComponent(auth.token() || '')}`);
     } catch {
       // WebSocket not available (SSR) — silently skip
       return;
