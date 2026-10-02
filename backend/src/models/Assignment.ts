@@ -10,6 +10,8 @@ export function stripNul<T>(v: T): T {
   return v;
 }
 
+export interface RubricLevel { marks: number; descriptor: string; example: string }
+
 export interface IQuestion {
   id: string;
   text: string;
@@ -20,6 +22,8 @@ export interface IQuestion {
   answer?: string;
   concept?: string;
   evidence?: string;
+  rubric?: RubricLevel[];
+  rubricEdited?: boolean;
 }
 
 export interface ISection {
@@ -151,6 +155,15 @@ export const Assignment = {
       "UPDATE vedai_assignments SET status='completed', output=$2::jsonb, error=NULL, updated_at=now() WHERE id=$1",
       [id, JSON.stringify(stripNul(output))]
     );
+  },
+
+  async setOutputForOwner(id: string, ownerId: string, output: IGeneratedOutput): Promise<boolean> {
+    if (!UUID_RE.test(id)) return false;
+    const r = await getDb().query(
+      "UPDATE vedai_assignments SET output=$3::jsonb, updated_at=now() WHERE id=$1 AND owner_id=$2 AND status='completed'",
+      [id, ownerId, JSON.stringify(stripNul(output))]
+    );
+    return (r.rowCount ?? 0) > 0;
   },
 
   async setFailed(id: string, error: string) {
