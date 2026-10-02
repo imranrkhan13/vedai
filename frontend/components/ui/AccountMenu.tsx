@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { auth } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, User, Settings, BookOpen, LogOut, HelpCircle, Bell, Star } from 'lucide-react';
 
@@ -7,6 +8,8 @@ export default function AccountMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const [email, setEmail] = useState('');
+  useEffect(() => { setEmail(auth.email() || ''); }, []);
 
   useEffect(() => {
     const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
@@ -16,6 +19,7 @@ export default function AccountMenu() {
 
   const items: { icon: any; label: string; action: () => void; highlight?: boolean; danger?: boolean }[] = [
     { icon: BookOpen,   label: 'My Assignments',     action: () => { router.push('/assignments'); setOpen(false); } },
+    { icon: LogOut,     label: 'Sign out',           danger: true, action: () => { auth.clear(); window.location.href = '/login'; } },
   ];
 
   return (
@@ -35,7 +39,7 @@ export default function AccountMenu() {
               <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'linear-gradient(135deg,#F97316,#FB923C)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 14 }}>T</div>
               <div>
                 <p style={{ fontSize: 13, fontWeight: 700, color: '#1A1A1A' }}>Teacher</p>
-                <p style={{ fontSize: 11, color: '#9CA3AF' }}>No account sign-in yet</p>
+                <p style={{ fontSize: 11, color: '#9CA3AF' }}>{email || 'Signed in'}</p>
               </div>
             </div>
           </div>
