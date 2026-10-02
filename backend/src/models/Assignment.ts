@@ -107,28 +107,32 @@ function rowToAssignment(r: any, withHeavy = true): IAssignment {
 }
 
 export const Assignment = {
-  async create(rawInput: NewAssignment): Promise<IAssignment> {
+  async create(rawInput: NewAssignment, ownerId?: string): Promise<IAssignment> {
     const input = stripNul(rawInput);
     const { rows } = await getDb().query(
       `INSERT INTO vedai_assignments (title, subject, due_date, question_types, number_of_questions, total_marks,
-         difficulty, additional_instructions, file_content, client_id, question_plan)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+         difficulty, additional_instructions, file_content, client_id, question_plan, owner_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
       [input.title, input.subject, input.dueDate, input.questionTypes, input.numberOfQuestions, input.totalMarks,
-       input.difficulty, input.additionalInstructions ?? null, input.fileContent ?? null, input.clientId ?? null, input.questionPlan ? JSON.stringify(input.questionPlan) : null]
+       input.difficulty, input.additionalInstructions ?? null, input.fileContent ?? null, input.clientId ?? null, input.questionPlan ? JSON.stringify(input.questionPlan) : null, ownerId ?? null]
     );
     return rowToAssignment(rows[0]);
   },
 
-  async findById(id: string): Promise<IAssignment | null> {
+  // With ownerId, only that owner's row is returned (used by every HTTP route). The worker calls it without one.
+  async findById(id: string, ownerId?: string): Promise<IAssignment | null> {
     if (!UUID_RE.test(id)) return null;
-    const { rows } = await getDb().query('SELECT * FROM vedai_assignments WHERE id = $1', [id]);
+    const { rows } = ownerId === undefined
+      ? await getDb().query('SELECT * FROM vedai_assignments WHERE id = $1', [id])
+      : await getDb().query('SELECT * FROM vedai_assignments WHERE id = $1 AND owner_id = $2', [id, ownerId]);
     return rows[0] ? rowToAssignment(rows[0]) : null;
   },
 
   // List view: no output / fileContent, newest first, max 50 (same as before).
-  async list(): Promise<IAssignment[]> {
+  async list(ownerId: string): Promise<IAssignment[]> {
     const { rows } = await getDb().query(
-      'SELECT id,title,subject,due_date,question_types,number_of_questions,total_marks,difficulty,additional_instructions,status,job_id,client_id,error,created_at,updated_at FROM vedai_assignments ORDER BY created_at DESC LIMIT 50'
+      'SELECT id,title,subject,due_date,question_types,number_of_questions,total_marks,difficulty,additional_instructions,status,job_id,client_id,error,created_at,updated_at FROM vedai_assignments WHERE owner_id = $1 ORDER BY created_at DESC LIMIT 50',
+      [ownerId]
     );
     return rows.map((r) => rowToAssignment(r, false));
   },
@@ -160,8 +164,9 @@ export const Assignment = {
     );
   },
 
-  async deleteById(id: string) {
-    if (!UUID_RE.test(id)) return;
-    await getDb().query('DELETE FROM vedai_assignments WHERE id=$1', [id]);
+  async deleteById(id: string, ownerId: string): Promise<boolean> {
+    if (!UUID_RE.test(id)) return false;
+    const r = await getDb().query('DELETE FROM vedai_assignments WHERE id=$1 AND owner_id=$2', [id, ownerId]);
+    return (r.rowCount ?? 0) > 0;
   },
 };
