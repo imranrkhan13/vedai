@@ -47,8 +47,8 @@ export const api = {
     }),
   saveRubric: (id: string, questionId: string, levels: { marks: number; descriptor: string; example: string }[]) =>
     fetchAPI(`/assignments/${id}/rubric`, { method: 'PATCH', body: JSON.stringify({ questionId, levels }) }),
-  gradeAnswer: (id: string, questionId: string, answer: string) =>
-    fetchAPI(`/assignments/${id}/grade`, { method: 'POST', body: JSON.stringify({ questionId, answer }) }),
+  gradeAnswer: (id: string, questionId: string, fixture: string, overwrite?: boolean) =>
+    fetchAPI(`/assignments/${id}/grade`, { method: 'POST', body: JSON.stringify({ questionId, fixture, overwrite }) }),
   saveGrade: (id: string, questionId: string, marks: number, reason: string) =>
     fetchAPI(`/assignments/${id}/grade`, { method: 'PATCH', body: JSON.stringify({ questionId, marks, reason }) }),
   deleteAssignment: (id: string) =>
