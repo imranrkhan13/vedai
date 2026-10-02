@@ -1,12 +1,66 @@
-import mongoose from 'mongoose';
+import { Pool } from 'pg';
+
+// Minimal query interface so tests can inject an in-memory Postgres.
+export interface Db {
+  query(text: string, params?: unknown[]): Promise<{ rows: any[]; rowCount: number | null }>;
+}
+
+let db: Db | null = null;
+
+export function setDb(custom: Db) {
+  db = custom;
+}
+
+export function getDb(): Db {
+  if (!db) throw new Error('Database not initialised. Call connectDB() first.');
+  return db;
+}
+
+export const SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS vedai_assignments (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  title TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  due_date TIMESTAMPTZ NOT NULL,
+  question_types TEXT[] NOT NULL DEFAULT '{}',
+  number_of_questions INTEGER NOT NULL CHECK (number_of_questions >= 1),
+  total_marks INTEGER NOT NULL CHECK (total_marks >= 1),
+  difficulty TEXT NOT NULL DEFAULT 'mixed' CHECK (difficulty IN ('easy','medium','hard','mixed')),
+  additional_instructions TEXT,
+  file_content TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','processing','completed','failed')),
+  job_id TEXT,
+  client_id TEXT,
+  output JSONB,
+  error TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS vedai_assignments_created_at_idx ON vedai_assignments (created_at DESC);
+`;
 
 export async function connectDB() {
-  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/vedaai';
-  try {
-    await mongoose.connect(uri);
-    console.log('✅ MongoDB connected');
-  } catch (err) {
-    console.error('❌ MongoDB connection error:', err);
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    console.error('❌ DATABASE_URL is not set (use the Neon connection string)');
     process.exit(1);
   }
+  try {
+    const pool = new Pool({
+      connectionString: url,
+      ssl: /localhost|127\.0\.0\.1/.test(url) ? undefined : { rejectUnauthorized: true },
+      max: 5,
+      idleTimeoutMillis: 30_000,
+    });
+    db = pool;
+    await pool.query(SCHEMA_SQL);
+    console.log('✅ Postgres connected');
+  } catch (err) {
+    console.error('❌ Postgres connection error:', err);
+    process.exit(1);
+  }
+}
+
+export async function initSchema(custom: Db) {
+  await custom.query(SCHEMA_SQL);
 }
