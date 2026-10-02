@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Assignment, WSMessage } from '@/types';
-import { api, auth } from '@/lib/api';
+import { api } from '@/lib/api';
 
 interface JobProgress {
   status: string;
@@ -26,6 +26,7 @@ interface AssignmentStore {
   disconnectWebSocket: () => void;
 }
 
+let wsPending = false;
 export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
   assignments: [],
   currentAssignment: null,
@@ -59,13 +60,18 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
     // Don't re-init if already connected
     const existing = get().ws;
     if (existing && existing.readyState <= WebSocket.OPEN) return;
+    if (wsPending) return;
+    wsPending = true;
+    // The session cookie is httpOnly and the socket is on another host, so a short-lived ticket authorises the connection.
+    api.wsTicket().then((t) => connect(t.ticket)).catch(() => {}).finally(() => { wsPending = false; });
 
+    function connect(ticket: string) {
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:5000/ws';
     const clientId = `client_${Math.random().toString(36).slice(2)}`;
 
     let ws: WebSocket;
     try {
-      ws = new WebSocket(`${wsUrl}?clientId=${clientId}&token=${encodeURIComponent(auth.token() || '')}`);
+      ws = new WebSocket(`${wsUrl}?clientId=${clientId}&ticket=${encodeURIComponent(ticket)}`);
     } catch {
       // WebSocket not available (SSR) — silently skip
       return;
@@ -142,6 +148,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
     };
 
     set({ ws });
+    }
   },
 
   disconnectWebSocket: () => {
