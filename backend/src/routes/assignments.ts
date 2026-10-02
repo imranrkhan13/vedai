@@ -5,6 +5,52 @@ import { getAssignmentQueue } from '../services/queue';
 import { getRedis } from '../services/redis';
 import { requireAuth } from '../services/auth';
 
+// Demo-only client for TypeSafe Jev "Score" questions. Server-side only; the key never reaches the browser.
+
+interface JevScoreResult {
+  score: number;
+  confidence: number;
+  probabilities: Record<string, number>;
+  model: string;
+}
+
+function jevEnabled(): boolean {
+  return process.env.JEV_ENABLED === 'true' && !!process.env.JEV_API_KEY;
+}
+
+const JEV_MAX_PER_PAPER = Number(process.env.JEV_MAX_PER_PAPER || 4);
+const JEV_MAX_PER_DAY = Number(process.env.JEV_MAX_PER_DAY || 15);
+
+// Hard app-wide daily cap (Redis counter). Returns false when the cap is reached.
+async function takeDailySlot(): Promise<boolean> {
+  const key = `jev:day:${new Date().toISOString().slice(0, 10)}`;
+  const r = getRedis();
+  const n = await r.incr(key);
+  if (n === 1) await r.expire(key, 60 * 60 * 30);
+  if (n > JEV_MAX_PER_DAY) { await r.decr(key); return false; }
+  return true;
+}
+
+async function jevScore(state: Record<string, string>, instructions: string, criteria: string[]): Promise<JevScoreResult> {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 25000);
+  try {
+    const resp = await fetch('https://api.typesafe.ai/v1/systemone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.JEV_API_KEY}` },
+      body: JSON.stringify({ state, model: 'jev-1.13.0', questions: { q: { type: 'score', instructions, criteria } } }),
+      signal: ctl.signal,
+    });
+    if (!resp.ok) throw new Error(`jev ${resp.status}`);
+    const j: any = await resp.json();
+    const a = j?.answers?.q;
+    if (!a || a.type !== 'score' || typeof a.score !== 'number' || !a.probabilities) throw new Error('jev bad shape');
+    return { score: a.score, confidence: Number(a.confidence), probabilities: a.probabilities, model: String(j.model || 'jev-1.13.0') };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 const router = Router();
 router.use(requireAuth);
 
@@ -134,6 +180,76 @@ router.patch('/:id/rubric', async (req: Request, res: Response) => {
     if (!ok) return res.status(404).json({ success: false, error: 'Not found' });
     await getRedis().del(`assignment:${req.params.id}`);
     return res.json({ success: true, data: { questionId: q.id, rubric: q.rubric } });
+  } catch {
+    return res.status(500).json({ success: false, error: 'Failed to save' });
+  }
+});
+
+const GradeSchema = z.object({ questionId: z.string().min(1).max(100), answer: z.string().min(20).max(1500) });
+
+// DEMO ONLY: grades a SYNTHETIC TEST answer against the saved 3-level rubric with Jev Score.
+router.post('/:id/grade', async (req: Request, res: Response) => {
+  try {
+    if (!jevEnabled()) return res.status(503).json({ success: false, error: 'The grading demo is not switched on.' });
+    const parsed = GradeSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ success: false, error: 'Answer must be 20 to 1500 characters.' });
+    if (!parsed.data.answer.startsWith('SYNTHETIC TEST')) return res.status(400).json({ success: false, error: 'Demo mode: the answer must start with "SYNTHETIC TEST". Real student answers are not accepted.' });
+    const a = await Assignment.findById(req.params.id as string, req.userId!);
+    if (!a || a.status !== 'completed' || !a.output) return res.status(404).json({ success: false, error: 'Not found' });
+    const q = a.output.sections.flatMap((sec) => sec.questions).find((x) => x.id === parsed.data.questionId);
+    if (!q) return res.status(404).json({ success: false, error: 'Question not found' });
+    if (!q.rubric || q.rubric.length !== 3) return res.status(400).json({ success: false, error: 'This question has no marking levels to grade against.' });
+    if ((a.output.gradeCalls || 0) >= JEV_MAX_PER_PAPER) return res.status(429).json({ success: false, error: 'Demo limit reached for this paper (' + JEV_MAX_PER_PAPER + ' gradings).' });
+    if (!(await takeDailySlot())) return res.status(429).json({ success: false, error: 'The demo daily limit has been reached. Try again tomorrow.' });
+    // ascending marks, the order Jev expects (low end to high end)
+    const asc = [...q.rubric].sort((x, y) => x.marks - y.marks).map((l) => ({ marks: Math.min(l.marks, q.marks), descriptor: l.descriptor }));
+    let r;
+    try {
+      r = await jevScore(
+        { exam_question: q.text, student_answer: parsed.data.answer },
+        'How well does `student_answer` answer `exam_question`? Judge it only against the levels.',
+        asc.map((l) => l.descriptor),
+      );
+    } catch {
+      a.output.gradeCalls = (a.output.gradeCalls || 0) + 1;
+      await Assignment.setOutputForOwner(a._id, req.userId!, a.output);
+      await getRedis().del(`assignment:${req.params.id}`);
+      return res.status(502).json({ success: false, error: 'The grading service did not return a usable answer. Nothing was changed except your demo allowance.' });
+    }
+    let best = 0; let bp = -1;
+    for (let i = 0; i < asc.length; i++) { const p = Number(r.probabilities[String(i)] ?? 0); if (p > bp) { bp = p; best = i; } }
+    q.grade = {
+      answer: parsed.data.answer, levelIndex: best, marks: asc[best].marks, probabilities: r.probabilities,
+      confidence: r.confidence, score: r.score, model: r.model, rubricSnapshot: asc, gradedAt: new Date().toISOString(),
+    };
+    a.output.gradeCalls = (a.output.gradeCalls || 0) + 1;
+    const ok = await Assignment.setOutputForOwner(a._id, req.userId!, a.output);
+    if (!ok) return res.status(404).json({ success: false, error: 'Not found' });
+    await getRedis().del(`assignment:${req.params.id}`);
+    return res.json({ success: true, data: { questionId: q.id, grade: q.grade, gradeCalls: a.output.gradeCalls, maxPerPaper: JEV_MAX_PER_PAPER } });
+  } catch {
+    return res.status(500).json({ success: false, error: 'Failed to grade' });
+  }
+});
+
+const GradeEditSchema = z.object({ questionId: z.string().min(1).max(100), marks: z.number().int().min(0).max(500), reason: z.string().trim().max(500).optional() });
+
+router.patch('/:id/grade', async (req: Request, res: Response) => {
+  try {
+    const parsed = GradeEditSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ success: false, error: 'Marks must be a whole number.' });
+    const a = await Assignment.findById(req.params.id as string, req.userId!);
+    if (!a || a.status !== 'completed' || !a.output) return res.status(404).json({ success: false, error: 'Not found' });
+    const q = a.output.sections.flatMap((sec) => sec.questions).find((x) => x.id === parsed.data.questionId);
+    if (!q || !q.grade) return res.status(404).json({ success: false, error: 'Not found' });
+    if (parsed.data.marks > q.marks) return res.status(400).json({ success: false, error: 'Marks cannot be more than the question maximum of ' + q.marks + '.' });
+    q.grade.teacherMarks = parsed.data.marks;
+    q.grade.reason = parsed.data.reason || '';
+    q.grade.edited = true;
+    const ok = await Assignment.setOutputForOwner(a._id, req.userId!, a.output);
+    if (!ok) return res.status(404).json({ success: false, error: 'Not found' });
+    await getRedis().del(`assignment:${req.params.id}`);
+    return res.json({ success: true, data: { questionId: q.id, teacherMarks: q.grade.teacherMarks, reason: q.grade.reason } });
   } catch {
     return res.status(500).json({ success: false, error: 'Failed to save' });
   }
