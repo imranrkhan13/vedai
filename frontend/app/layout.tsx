@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Toaster } from 'react-hot-toast';
 import './globals.css';
+import AuthGate from '@/components/AuthGate';
 
 export const metadata: Metadata = {
   title: 'VedaAI',
@@ -17,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body>
-        {children}
+        <AuthGate>{children}</AuthGate>
         <Toaster position="top-right" toastOptions={{
           style: {
             background: '#fff', color: '#1A1A1A',
