@@ -21,6 +21,7 @@ RULES:
 - Total questions across ALL sections must equal exactly ${a.numberOfQuestions}
 - Questions must be specific, academically rigorous, and about ${a.subject}
 - Each question must have: text, difficulty (easy|medium|hard), marks (number), type (string), concept (2-4 words naming the single fact or skill it tests; every question needs a different concept), answer (the correct answer or a short model answer)
+- For every question worth 3 or more marks that is not an MCQ, also add a "rubric": exactly 3 levels, from best to weakest, each {"marks": whole number, "descriptor": "what an answer at this level contains", "example": "a short sample answer at this level (2-4 sentences)"}. The best level's marks equal the question's marks, the others are strictly lower whole numbers, and the weakest is at least 0. The examples are illustrative, not student work.
 - Every MCQ question MUST also have an "options" array of exactly 4 distinct answer choices (plain text, no A/B/C/D prefixes), and its "answer" must be exactly one of those options
 - Every question must test a different fact or skill; never ask about the same fact twice, even in different words
 - Use ONLY these question types, and use each at least once: ${a.questionTypes.join(', ')}. Set each question's "type" to the matching label (MCQ, Short, Long, Diagram, Numerical, True/False, Fill, Essay)
@@ -260,6 +261,16 @@ export function parseResponse(raw: string, a: IAssignment): IGeneratedOutput {
         const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
         const quote = stripNul(q.source).trim().slice(0, 240);
         if (norm(quote).length >= 15 && norm(a.fileContent.slice(0, 2000)).includes(norm(quote))) out.evidence = quote;
+      }
+      if (Array.isArray(q.rubric) && out.marks >= 3 && canonicalType(type) !== 'mcq') {
+        const lv = q.rubric.slice(0, 3).map((r: any) => ({
+          marks: Number(r?.marks),
+          descriptor: stripNul(String(r?.descriptor ?? '')).trim().slice(0, 500),
+          example: stripNul(String(r?.example ?? '')).trim().slice(0, 700),
+        }));
+        const ok = lv.length === 3 && lv.every((r: any) => Number.isInteger(r.marks) && r.marks >= 0 && r.marks <= out.marks && r.descriptor && r.example)
+          && lv[0].marks === out.marks && lv[0].marks > lv[1].marks && lv[1].marks > lv[2].marks;
+        if (ok) out.rubric = lv;
       }
       if (q.concept) out.concept = stripNul(String(q.concept)).trim().slice(0, 80);
       if (Array.isArray(q.options)) out.options = q.options.map((o: any) => stripNul(String(o)).trim()).filter(Boolean);
