@@ -55,6 +55,59 @@ function RubricGuide({ a, onSaved }:{ a:any; onSaved:()=>void }){
   );
 }
 
+function GradingDemo({ a, onChanged }:{ a:any; onChanged:()=>void }){
+  const qs:Question[] = (a.output.sections as Section[]).flatMap((sec:Section)=>sec.questions).filter((q:Question)=>q.rubric&&q.rubric.length===3);
+  const [ans,setAns] = useState<Record<string,string>>({});
+  const [marks,setMarks] = useState<Record<string,string>>({});
+  const [why,setWhy] = useState<Record<string,string>>({});
+  const [busy,setBusy] = useState('');
+  if(qs.length===0) return null;
+  const id = a._id||a.id;
+  const run = async (q:Question)=>{
+    const t = (ans[q.id]||'').trim();
+    if(!t.startsWith('SYNTHETIC TEST')||t.length<20){ toast.error('Demo mode: type an answer that starts with SYNTHETIC TEST (at least 20 characters).'); return; }
+    setBusy(q.id);
+    try { await api.gradeAnswer(id, q.id, t); toast.success('Draft marks ready for your review'); onChanged(); }
+    catch(err:unknown){ toast.error(err instanceof Error?err.message:'Could not grade'); }
+    finally { setBusy(''); }
+  };
+  const save = async (q:Question)=>{
+    const g = q.grade!; const v = marks[q.id]!==undefined?Number(marks[q.id]):(g.teacherMarks??g.marks);
+    if(!Number.isInteger(v)||v<0||v>q.marks){ toast.error(`Marks must be a whole number from 0 to ${q.marks}`); return; }
+    setBusy(q.id);
+    try { await api.saveGrade(id, q.id, v, why[q.id]??g.reason??''); toast.success('Your marks are saved'); onChanged(); }
+    catch(err:unknown){ toast.error(err instanceof Error?err.message:'Could not save'); }
+    finally { setBusy(''); }
+  };
+  return (
+    <div className="card fade-up" style={{ padding:'16px 20px', marginTop:14, maxWidth:760 }}>
+      <h3 style={{ fontSize:14, fontWeight:700, color:'var(--black)', marginBottom:4 }}>Grading demo (synthetic answers only)</h3>
+      <p style={{ fontSize:11, color:'var(--gray-500)', lineHeight:1.5, marginBottom:12 }}>Demo only. Type a made-up answer that starts with SYNTHETIC TEST. Do not paste real student work. The text is sent to TypeSafe&apos;s Jev model, which picks the marking level that fits best. The draft marks and the confidence are the model&apos;s, they are not proof the marks are right. The confidence shows how sure the model is, not whether it is correct. You decide the final marks. Limited number of gradings per paper and per day.</p>
+      {qs.map((q,qi)=>{ const g=q.grade; return (
+        <div key={q.id} style={{ borderTop:qi?'1px solid var(--border)':'none', paddingTop:qi?12:0, marginTop:qi?12:0 }}>
+          <p style={{ fontSize:13, fontWeight:600, color:'var(--black)', marginBottom:6 }}>{q.text} <span style={{ color:'var(--gray-500)', fontWeight:500 }}>[max {q.marks}]</span></p>
+          <textarea className="input" value={ans[q.id]??''} onChange={e=>setAns(x=>({...x,[q.id]:e.target.value}))} placeholder="SYNTHETIC TEST answer..." style={{ minHeight:110, fontSize:12, width:'100%' }} aria-label="Synthetic test answer"/>
+          <button className="btn btn-orange" onClick={()=>run(q)} disabled={busy===q.id} style={{ fontSize:12, marginTop:6 }}>{busy===q.id?'Working...':(g?'Grade again':'Get draft marks')}</button>
+          {g&&(
+            <div style={{ marginTop:10, fontSize:12, color:'var(--gray-500)', lineHeight:1.6 }}>
+              <p><b style={{ color:'var(--black)' }}>Draft marks: {g.marks} / {q.marks}</b> (level: {g.rubricSnapshot[g.levelIndex]?.descriptor})</p>
+              <p>Model-reported confidence: {Math.round(g.confidence*100)}%{g.confidence<0.6?' (low, check this one carefully)':''}. Model: {g.model}, Jev Score question. Level chances: {g.rubricSnapshot.map((l,i)=>`${l.marks} marks ${Math.round((g.probabilities[String(i)]||0)*100)}%`).join(', ')}.</p>
+              <p style={{ fontStyle:'italic' }}>Answer graded: &ldquo;{g.answer}&rdquo;</p>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
+                <span>Your marks:</span>
+                <input className="input" type="number" min={0} max={q.marks} value={marks[q.id]??String(g.teacherMarks??g.marks)} onChange={e=>setMarks(x=>({...x,[q.id]:e.target.value}))} style={{ width:64, height:34, fontSize:13 }} aria-label="Your marks"/>
+                <input className="input" value={why[q.id]??g.reason??''} onChange={e=>setWhy(x=>({...x,[q.id]:e.target.value}))} placeholder="Reason (optional)" style={{ flex:'1 1 200px', height:34, fontSize:12 }} aria-label="Reason for marks"/>
+                <button className="btn btn-orange" onClick={()=>save(q)} disabled={busy===q.id} style={{ fontSize:12 }}>Save my marks</button>
+              </div>
+              {g.edited&&<p style={{ marginTop:4 }}>Saved by you: {g.teacherMarks} / {q.marks}{g.reason?` - ${g.reason}`:''}</p>}
+            </div>
+          )}
+        </div>
+      ); })}
+    </div>
+  );
+}
+
 const DIFF_LABEL: Record<string,string> = { easy:'Easy', medium:'Moderate', hard:'Challenging' };
 
 export default function OutputPage() {
@@ -326,6 +379,8 @@ export default function OutputPage() {
 
               <RubricGuide key={JSON.stringify((a.output.sections as Section[]).flatMap((x:Section)=>x.questions.map((y:Question)=>y.rubric||null)))} a={a} onSaved={()=>{ api.getAssignment(a._id||(a as any).id).then(()=>window.location.reload()).catch(()=>window.location.reload()); }}/>
 
+              <GradingDemo key={'g'+JSON.stringify((a.output.sections as Section[]).flatMap((x:Section)=>x.questions.map((y:Question)=>y.grade||null)))} a={a} onChanged={()=>window.location.reload()}/>
+
               {/* Difficulty breakdown */}
               <div className="card fade-up" style={{ padding:'14px 20px', marginTop:14, maxWidth:760, display:'flex', gap:20, alignItems:'center', flexWrap:'wrap' }}>
                 <span style={{ fontSize:12, color:'var(--gray-400)', fontWeight:500 }}>Difficulty breakdown:</span>
@@ -342,4 +397,4 @@ export default function OutputPage() {
       </main>
     </div>
   );
-}
+                    }
