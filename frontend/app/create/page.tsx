@@ -54,8 +54,10 @@ export default function CreatePage() {
     setQRows(r=>r.map((row,idx)=>idx===i?{...row,[key]:val}:row));
 
   const readPdfText = async (file:File) => {
-    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-    pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/legacy/build/pdf.worker.min.mjs', import.meta.url).toString();
+    // pdf.js is loaded in the browser from a pinned CDN version (no server cost, no extra dependency to bundle).
+    const base = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.149/build/';
+    const pdfjs: any = await import(/* webpackIgnore: true */ base + 'pdf.min.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.mjs';
     const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
     let out = '';
     for(let p=1; p<=Math.min(doc.numPages,20) && out.length<20000; p++){
