@@ -205,7 +205,7 @@ export default function CreatePage() {
             <div className="stagger">
               {qRows.map((row,i)=>(
                 <div key={i} className="fade-up qgrid" style={{ display:'grid', gap:8, marginBottom:8, alignItems:'center' }}>
-                  <select className="input" value={row.type} onChange={e=>updateRow(i,'type',e.target.value)} style={{ height:36, fontSize:13, padding:'0 28px 0 10px' }}>
+                  <select className="input qsel" value={row.type} onChange={e=>updateRow(i,'type',e.target.value)} style={{ height:36, fontSize:13, padding:'0 28px 0 10px' }}>
                     {Q_TYPES.map(t=><option key={t}>{t}</option>)}
                   </select>
                   <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:6 }}>
