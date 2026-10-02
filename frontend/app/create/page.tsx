@@ -53,9 +53,31 @@ export default function CreatePage() {
   const updateRow = (i:number, key:keyof QRow, val:string|number) =>
     setQRows(r=>r.map((row,idx)=>idx===i?{...row,[key]:val}:row));
 
-  const readFile = (file:File) => {
-    if(!/\.txt$/i.test(file.name)){ toast.error('Only .txt files are supported right now (PDF and image reading is not available)'); return; }
+  const readPdfText = async (file:File) => {
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/legacy/build/pdf.worker.min.mjs', import.meta.url).toString();
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    let out = '';
+    for(let p=1; p<=Math.min(doc.numPages,20) && out.length<20000; p++){
+      const page = await doc.getPage(p);
+      const tc = await page.getTextContent();
+      out += tc.items.map((it:any)=>it.str).join(' ') + '\n';
+    }
+    return out.replace(/\0/g,'').trim();
+  };
+
+  const readFile = async (file:File) => {
+    const isPdf = /\.pdf$/i.test(file.name);
+    if(!isPdf && !/\.txt$/i.test(file.name)){ toast.error('Only .txt and text-based .pdf files are supported (images and scanned PDFs cannot be read)'); return; }
     if(file.size>10*1024*1024){ toast.error('Max 10MB'); return; }
+    if(isPdf){
+      try {
+        const text = await readPdfText(file);
+        if(text.length<20){ toast.error('This PDF has no selectable text (scanned PDFs are not supported)'); return; }
+        setFileName(file.name); setFileContent(text);
+      } catch { toast.error('Could not read this PDF'); }
+      return;
+    }
     setFileName(file.name);
     const reader = new FileReader();
     reader.onload = ev => setFileContent(ev.target?.result as string||'');
@@ -79,6 +101,7 @@ export default function CreatePage() {
         title: title.trim()||`${subject} Assessment`,
         subject, dueDate,
         questionTypes: qRows.map(r=>r.type),
+        questionPlan: qRows.map(r=>({ type:r.type, qty:r.qty, marks:r.marks })),
         numberOfQuestions: totalQ, totalMarks: totalM,
         difficulty: 'mixed',
         additionalInstructions: additionalInfo||undefined,
@@ -116,7 +139,7 @@ export default function CreatePage() {
             <h2 style={{ fontSize:14, fontWeight:600, marginBottom:3, color:'var(--black)' }}>Assignment Details</h2>
             <p style={{ fontSize:12, color:'var(--gray-400)', marginBottom:18 }}>Basic information about your assignment</p>
 
-            <input ref={fileRef} type="file" accept=".txt,text/plain" style={{ display:'none' }} onChange={e=>e.target.files?.[0]&&readFile(e.target.files[0])}/>
+            <input ref={fileRef} type="file" accept=".txt,.pdf,text/plain,application/pdf" style={{ display:'none' }} onChange={e=>e.target.files?.[0]&&readFile(e.target.files[0])}/>
             {!fileName?(
               <div onClick={()=>fileRef.current?.click()}
                 onDragOver={e=>{e.preventDefault();setDragOver(true);}}
@@ -127,7 +150,7 @@ export default function CreatePage() {
                   <Upload size={16} color="#9CA3AF"/>
                 </div>
                 <p style={{ fontSize:13, color:'var(--gray-500)', marginBottom:4 }}>Choose a file or drag &amp; drop it here</p>
-                <p style={{ fontSize:11, color:'var(--gray-400)', marginBottom:12 }}>TXT files only, up to 10MB</p>
+                <p style={{ fontSize:11, color:'var(--gray-400)', marginBottom:12 }}>TXT or text-based PDF, up to 10MB</p>
                 <button className="btn btn-ghost btn-sm" type="button" onClick={e=>{e.stopPropagation();fileRef.current?.click();}}>Browse Files</button>
               </div>
             ):(
