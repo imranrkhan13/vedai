@@ -217,7 +217,7 @@ input[type="number"] { -moz-appearance: textfield; }
 .mlabel { display: none; font-size: 11px; color: var(--gray-500); }
 @media (max-width: 520px) {
   .qgrid { grid-template-columns: 1fr 1fr 32px; }
-  .qgrid > .qsel { grid-column: 1 / -1 !important; }
+  .qgrid > .qsel, .qgrid > :first-child { grid-column: 1 / -1 !important; }
   .qhead { display: none !important; }
   .mlabel { display: inline; }
 }
