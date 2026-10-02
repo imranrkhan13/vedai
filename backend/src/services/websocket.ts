@@ -13,7 +13,7 @@ export function initWebSocket(server: Server) {
   wss.on('connection', (ws, req) => {
     const url = new URL(req.url || '', 'http://localhost');
     // Only signed-in users may listen. Messages are routed to `<userId>:<clientId>`, so one user cannot receive another user's events.
-    const uid = verifyToken(url.searchParams.get('token') || '');
+    const uid = verifyToken(url.searchParams.get('ticket') || '', 'ws');
     if (!uid) { ws.close(1008, 'unauthorized'); return; }
     const shown = url.searchParams.get('clientId') || Math.random().toString(36).slice(2);
     const clientId = `${uid}:${shown}`;
