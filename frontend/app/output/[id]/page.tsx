@@ -41,7 +41,7 @@ export default function OutputPage() {
     toast('Preparing PDF...');
     try {
       const html2pdf = (await import('html2pdf.js')).default;
-      await html2pdf().set({ margin:[12,12,12,12], filename:`${currentAssignment?.title||'question-paper'}.pdf`, html2canvas:{ scale:2, useCORS:true, logging:false }, jsPDF:{ unit:'mm', format:'a4', orientation:'portrait' } }).from(printRef.current).save();
+      await html2pdf().set({ margin:[12,12,12,12], filename:`${currentAssignment?.title||'question-paper'}.pdf`, html2canvas:{ scale:2, useCORS:true, logging:false }, pagebreak:{ mode:['css','legacy'], avoid:['.avoid-break','h3'] }, jsPDF:{ unit:'mm', format:'a4', orientation:'portrait' } } as any).from(printRef.current).save();
       toast.success('PDF downloaded!');
     } catch { toast.error('PDF failed'); }
     finally { setDownloading(false); }
@@ -65,7 +65,6 @@ export default function OutputPage() {
 
   const a = currentAssignment;
   const prog = jobProgress[id];
-  const progressPct = prog?.progress||(a?.status==='processing'?40:10);
   const isProcessing = a?.status==='pending'||a?.status==='processing';
   const isFailed = a?.status==='failed';
   const isCompleted = a?.status==='completed';
@@ -122,28 +121,9 @@ export default function OutputPage() {
               <p style={{ color:'var(--gray-400)', fontSize:13, marginBottom:32, maxWidth:360, margin:'0 auto 32px', lineHeight:1.7 }}>
                 AI is crafting <strong style={{ color:'var(--black)' }}>{a.numberOfQuestions} questions</strong> for <strong style={{ color:'var(--black)' }}>{a.subject}</strong>.
               </p>
-              <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:0, marginBottom:28, maxWidth:420, margin:'0 auto 28px' }}>
-                {['Analysing','Structuring','Writing','Finalising'].map((step,i)=>{
-                  const stepPct=(i+1)*25; const done=progressPct>=stepPct; const active=progressPct>=i*25&&progressPct<stepPct;
-                  return (
-                    <div key={step} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', position:'relative' }}>
-                      {i>0&&<div style={{ position:'absolute', left:0, top:14, width:'50%', height:2, background:done?'var(--orange)':'var(--gray-200)', transition:'background 0.4s' }}/>}
-                      {i<3&&<div style={{ position:'absolute', right:0, top:14, width:'50%', height:2, background:done&&i<3?'var(--orange)':'var(--gray-200)', transition:'background 0.4s' }}/>}
-                      <div style={{ width:28, height:28, borderRadius:'50%', zIndex:1, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, transition:'all 0.3s', background:done?'var(--orange)':active?'var(--orange-dim)':'var(--gray-100)', border:`2px solid ${done||active?'var(--orange)':'var(--gray-200)'}`, color:done?'#fff':active?'var(--orange)':'var(--gray-400)', marginBottom:6 }}>
-                        {done?'✓':i+1}
-                      </div>
-                      <span style={{ fontSize:10, color:done||active?'var(--orange)':'var(--gray-400)', fontWeight:done||active?600:400 }}>{step}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ maxWidth:360, margin:'0 auto' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'var(--gray-400)', marginBottom:6 }}>
-                  <span>{prog?.message||'Processing...'}</span>
-                  <span style={{ color:'var(--orange)', fontWeight:700 }}>{progressPct}%</span>
-                </div>
-                <div className="progress-bar"><div className="progress-fill" style={{ width:`${progressPct}%` }}/></div>
-              </div>
+              <p style={{ fontSize:13, color:'var(--gray-500)', margin:'0 auto', maxWidth:380, lineHeight:1.6 }}>
+                {prog?.message ? `Server status: ${prog.message}` : 'Waiting for the server. Generation usually takes 1 to 3 minutes. This page checks every few seconds.'}
+              </p>
             </div>
           )}
 
@@ -211,14 +191,14 @@ export default function OutputPage() {
                   ))}
                 </div>
                 <div style={{ padding:'0 48px' }}>
-                  {a.output.sections.map((sec:Section,si:number)=>(
+                  {a.output.sections.map((sec:Section,si:number)=>{ const qOffset=a.output!.sections.slice(0,si).reduce((n:number,x:Section)=>n+x.questions.length,0); return (
                     <div key={si} style={{ paddingTop:22, paddingBottom:8, borderBottom:si<a.output!.sections.length-1?'1px dashed var(--border)':'none' }}>
                       <h3 style={{ fontSize:15, fontWeight:700, color:'var(--black)', textAlign:'center', marginBottom:2 }}>{sec.title}</h3>
                       <p style={{ fontSize:12, color:'var(--gray-500)', fontStyle:'italic', textAlign:'center', marginBottom:2 }}>{sec.instruction}</p>
                       <ol style={{ listStyle:'none', padding:0 }}>
                         {sec.questions.map((q:Question,qi:number)=>(
-                          <li key={q.id||qi} style={{ display:'flex', gap:8, marginBottom:12, fontSize:13, color:'var(--black)', lineHeight:1.6 }}>
-                            <span style={{ fontWeight:600, minWidth:22, flexShrink:0, color:'var(--gray-700)' }}>{qi+1}.</span>
+                          <li key={q.id||qi} className="avoid-break" style={{ breakInside:'avoid', pageBreakInside:'avoid', display:'flex', gap:8, marginBottom:12, fontSize:13, color:'var(--black)', lineHeight:1.6 }}>
+                            <span style={{ fontWeight:600, minWidth:22, flexShrink:0, color:'var(--gray-700)' }}>{qOffset+qi+1}.</span>
                             <span>
                               <span style={{ color:'var(--gray-500)' }}>[{DIFF_LABEL[q.difficulty]||q.difficulty}] </span>
                               {q.text}
@@ -233,8 +213,8 @@ export default function OutputPage() {
                         ))}
                       </ol>
                     </div>
-                  ))}
-                  <div style={{ textAlign:'center', padding:'16px 0', borderTop:'1px solid var(--border)', marginTop:8 }}>
+                  );})}
+                  <div className="avoid-break" style={{ textAlign:'center', padding:'16px 0', borderTop:'1px solid var(--border)', marginTop:8, breakInside:'avoid', pageBreakInside:'avoid' }}>
                     <p style={{ fontSize:13, fontWeight:700, color:'var(--black)' }}>End of Question Paper</p>
                   </div>
                   {a.output.sections.some((sec:Section)=>sec.questions.some((q:Question)=>q.answer))&&(
