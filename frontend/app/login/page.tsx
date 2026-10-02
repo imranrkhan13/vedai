@@ -17,7 +17,7 @@ export default function LoginPage() {
     setBusy(true);
     try {
       const r = mode === 'login' ? await api.login(email, password) : await api.register(email, password);
-      auth.save(r.token, r.user.email);
+      auth.save(r.user.email);
       router.replace('/assignments');
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Could not sign in');
