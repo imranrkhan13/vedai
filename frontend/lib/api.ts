@@ -1,18 +1,17 @@
 import { Assignment, CreateAssignmentInput } from '@/types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
+// The session lives in an httpOnly cookie that scripts cannot read. Only the display email is kept in localStorage.
 export const auth = {
-  token: () => (typeof window === 'undefined' ? null : localStorage.getItem('vedai_token')),
   email: () => (typeof window === 'undefined' ? null : localStorage.getItem('vedai_email')),
-  save: (token: string, email: string) => { localStorage.setItem('vedai_token', token); localStorage.setItem('vedai_email', email); },
-  clear: () => { localStorage.removeItem('vedai_token'); localStorage.removeItem('vedai_email'); },
+  save: (email: string) => { localStorage.setItem('vedai_email', email); },
+  clear: () => { localStorage.removeItem('vedai_email'); },
 };
 
 async function fetchAPI<T>(path: string, options?: RequestInit): Promise<T> {
-  const t = auth.token();
-  const res = await fetch(`${API_URL}/api${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}) },
+  const res = await fetch(`/api${path}`, {
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'quillix' },
     ...options,
   });
   const data = await res.json();
@@ -28,9 +27,12 @@ async function fetchAPI<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   login: (email: string, password: string) =>
-    fetchAPI<{ token: string; user: { id: string; email: string } }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+    fetchAPI<{ user: { id: string; email: string } }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   register: (email: string, password: string) =>
-    fetchAPI<{ token: string; user: { id: string; email: string } }>('/auth/register', { method: 'POST', body: JSON.stringify({ email, password }) }),
+    fetchAPI<{ user: { id: string; email: string } }>('/auth/register', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  me: () => fetchAPI<{ id: string; email: string }>('/auth/me'),
+  logout: () => fetchAPI('/auth/logout', { method: 'POST', body: '{}' }),
+  wsTicket: () => fetchAPI<{ ticket: string }>('/auth/ws-ticket'),
   getAssignments: () => fetchAPI<Assignment[]>('/assignments'),
   getAssignment: (id: string) => fetchAPI<Assignment>(`/assignments/${id}`),
   createAssignment: (input: CreateAssignmentInput) =>
