@@ -24,6 +24,22 @@ export interface IQuestion {
   evidence?: string;
   rubric?: RubricLevel[];
   rubricEdited?: boolean;
+  grade?: QuestionGrade;
+}
+
+export interface QuestionGrade {
+  answer: string;            // SYNTHETIC TEST answer text only (demo mode)
+  levelIndex: number;        // index in the ascending rubric snapshot (argmax of model probabilities)
+  marks: number;             // marks of that level (never above question max)
+  probabilities: Record<string, number>;
+  confidence: number;        // model-reported spread of probabilities, NOT accuracy
+  score: number;
+  model: string;
+  rubricSnapshot: { marks: number; descriptor: string }[]; // ascending marks, exactly what was sent
+  gradedAt: string;
+  teacherMarks?: number;
+  reason?: string;
+  edited?: boolean;
 }
 
 export interface ISection {
@@ -40,6 +56,7 @@ export interface IGeneratedOutput {
   totalMarks: number;
   duration?: string;
   sections: ISection[];
+  gradeCalls?: number;
   generatedAt: Date;
 }
 
