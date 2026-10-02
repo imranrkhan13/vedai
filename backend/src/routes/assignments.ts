@@ -15,8 +15,15 @@ interface JevScoreResult {
 }
 
 function jevEnabled(): boolean {
-  return process.env.JEV_ENABLED === 'true' && !!process.env.JEV_API_KEY;
+  return process.env.JEV_ENABLED === 'true' && !!process.env.JEV_API_KEY && !!process.env.JEV_DEMO_USER_ID;
 }
+
+// Server-fixed SYNTHETIC answers (photosynthesis demo passage). No user-typed text is ever sent to Jev.
+const JEV_FIXTURES: Record<string, string> = {
+  full: 'SYNTHETIC TEST Chlorophyll in the chloroplasts of the leaf absorbs sunlight. Carbon dioxide enters through the stomata and water comes up from the roots. The plant turns carbon dioxide and water into glucose and releases oxygen. Extra glucose is stored as starch, and without sunlight the process slows and stops.',
+  partial: 'SYNTHETIC TEST Chlorophyll absorbs sunlight and the plant uses carbon dioxide and water to make glucose. Oxygen is released.',
+  weak: 'SYNTHETIC TEST Plants use sunlight and water to grow. They need light.',
+};
 
 const JEV_MAX_PER_PAPER = Number(process.env.JEV_MAX_PER_PAPER || 4);
 const JEV_MAX_PER_DAY = Number(process.env.JEV_MAX_PER_DAY || 15);
@@ -185,20 +192,22 @@ router.patch('/:id/rubric', async (req: Request, res: Response) => {
   }
 });
 
-const GradeSchema = z.object({ questionId: z.string().min(1).max(100), answer: z.string().min(20).max(1500) });
+const GradeSchema = z.object({ questionId: z.string().min(1).max(100), fixture: z.enum(['full', 'partial', 'weak']), overwrite: z.boolean().optional() });
 
 // DEMO ONLY: grades a SYNTHETIC TEST answer against the saved 3-level rubric with Jev Score.
 router.post('/:id/grade', async (req: Request, res: Response) => {
   try {
     if (!jevEnabled()) return res.status(503).json({ success: false, error: 'The grading demo is not switched on.' });
     const parsed = GradeSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ success: false, error: 'Answer must be 20 to 1500 characters.' });
-    if (!parsed.data.answer.startsWith('SYNTHETIC TEST')) return res.status(400).json({ success: false, error: 'Demo mode: the answer must start with "SYNTHETIC TEST". Real student answers are not accepted.' });
+    if (!parsed.success) return res.status(400).json({ success: false, error: 'Pick one of the built-in synthetic demo answers.' });
+    if (req.userId !== process.env.JEV_DEMO_USER_ID) return res.status(403).json({ success: false, error: 'The grading demo is limited to the approved demo account.' });
+    const fixtureAnswer = JEV_FIXTURES[parsed.data.fixture];
     const a = await Assignment.findById(req.params.id as string, req.userId!);
     if (!a || a.status !== 'completed' || !a.output) return res.status(404).json({ success: false, error: 'Not found' });
     const q = a.output.sections.flatMap((sec) => sec.questions).find((x) => x.id === parsed.data.questionId);
     if (!q) return res.status(404).json({ success: false, error: 'Question not found' });
     if (!q.rubric || q.rubric.length !== 3) return res.status(400).json({ success: false, error: 'This question has no marking levels to grade against.' });
+    if (q.grade && q.grade.edited && !parsed.data.overwrite) return res.status(409).json({ success: false, error: 'You already saved your own marks for this question. Grading again keeps them in history but replaces the draft. Confirm to continue.' });
     if ((a.output.gradeCalls || 0) >= JEV_MAX_PER_PAPER) return res.status(429).json({ success: false, error: 'Demo limit reached for this paper (' + JEV_MAX_PER_PAPER + ' gradings).' });
     if (!(await takeDailySlot())) return res.status(429).json({ success: false, error: 'The demo daily limit has been reached. Try again tomorrow.' });
     // ascending marks, the order Jev expects (low end to high end)
@@ -206,7 +215,7 @@ router.post('/:id/grade', async (req: Request, res: Response) => {
     let r;
     try {
       r = await jevScore(
-        { exam_question: q.text, student_answer: parsed.data.answer },
+        { exam_question: q.text, student_answer: fixtureAnswer },
         'How well does `student_answer` answer `exam_question`? Judge it only against the levels.',
         asc.map((l) => l.descriptor),
       );
@@ -218,8 +227,10 @@ router.post('/:id/grade', async (req: Request, res: Response) => {
     }
     let best = 0; let bp = -1;
     for (let i = 0; i < asc.length; i++) { const p = Number(r.probabilities[String(i)] ?? 0); if (p > bp) { bp = p; best = i; } }
+    const hist = (q as any).gradeHistory || [];
+    if (q.grade) { hist.push(q.grade); (q as any).gradeHistory = hist.slice(-5); }
     q.grade = {
-      answer: parsed.data.answer, levelIndex: best, marks: asc[best].marks, probabilities: r.probabilities,
+      answer: fixtureAnswer, levelIndex: best, marks: asc[best].marks, probabilities: r.probabilities,
       confidence: r.confidence, score: r.score, model: r.model, rubricSnapshot: asc, gradedAt: new Date().toISOString(),
     };
     a.output.gradeCalls = (a.output.gradeCalls || 0) + 1;
