@@ -15,7 +15,7 @@ interface JevScoreResult {
 }
 
 function jevEnabled(): boolean {
-  return process.env.JEV_ENABLED === 'true' && !!process.env.JEV_API_KEY && !!process.env.JEV_DEMO_USER_ID;
+  return process.env.JEV_ENABLED === 'true' && !!process.env.JEV_API_KEY && !!process.env.JEV_DEMO_USER_ID && !!process.env.JEV_DEMO_ASSIGNMENT_ID;
 }
 
 // Server-fixed SYNTHETIC answers (photosynthesis demo passage). No user-typed text is ever sent to Jev.
@@ -202,6 +202,7 @@ router.post('/:id/grade', async (req: Request, res: Response) => {
     if (!parsed.success) return res.status(400).json({ success: false, error: 'Pick one of the built-in synthetic demo answers.' });
     if (req.userId !== process.env.JEV_DEMO_USER_ID) return res.status(403).json({ success: false, error: 'The grading demo is limited to the approved demo account.' });
     const fixtureAnswer = JEV_FIXTURES[parsed.data.fixture];
+    if (!process.env.JEV_DEMO_ASSIGNMENT_ID || req.params.id !== process.env.JEV_DEMO_ASSIGNMENT_ID) return res.status(403).json({ success: false, error: 'The built-in demo answers only apply to the demo paper.' });
     const a = await Assignment.findById(req.params.id as string, req.userId!);
     if (!a || a.status !== 'completed' || !a.output) return res.status(404).json({ success: false, error: 'Not found' });
     const q = a.output.sections.flatMap((sec) => sec.questions).find((x) => x.id === parsed.data.questionId);
