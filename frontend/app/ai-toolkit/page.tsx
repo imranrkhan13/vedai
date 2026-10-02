@@ -126,7 +126,7 @@ export default function AIToolkitPage() {
 
                 <div id="toolkit-paper" className="card fade-up" style={{ padding:'28px 36px', maxWidth:760 }}>
                   <div style={{ textAlign:'center', paddingBottom:16, borderBottom:'2px solid var(--black)', marginBottom:20 }}>
-                    <h2 style={{ fontSize:16, fontWeight:700, marginBottom:4 }}>Delhi Public School, Sector-4, Bokaro</h2>
+                    <h2 style={{ fontSize:16, fontWeight:700, marginBottom:4 }}>Question Paper</h2>
                     <p style={{ fontSize:14, color:'var(--gray-700)', marginBottom:8 }}>Subject: {selected.subject}</p>
                     <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--gray-700)' }}>
                       <span>Time Allowed: {selected.output?.duration||'2 hours'}</span>
