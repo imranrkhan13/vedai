@@ -13,7 +13,7 @@ Total Marks: ${a.totalMarks}
 Question Types: ${a.questionTypes.join(', ')}
 ${a.questionPlan ? `Exact plan (follow it exactly):\n${a.questionPlan.map((r) => `  - ${r.qty} question(s) of type "${r.type}", each worth exactly ${r.marks} mark(s)`).join('\n')}\n` : ''}Difficulty: ${a.difficulty === 'mixed' ? 'Mix — 30% easy, 50% medium, 20% hard' : a.difficulty}
 ${a.additionalInstructions ? `Special Instructions: ${a.additionalInstructions}` : ''}
-${a.fileContent ? `Reference Content (use this to frame questions):\n${a.fileContent.slice(0, 2000)}` : ''}
+${a.fileContent ? `Source text. STRICT: every question and answer must be answerable from this text only. Do not add facts, topics or general knowledge that are not in it. If the text is too short for the requested count, still return the count but keep each question tightly tied to a different sentence of the source, and put the exact source sentence it is based on at the start of the answer after 'Source: ':\n${a.fileContent.slice(0, 2000)}` : ''}
 
 RULES:
 - Return ONLY a JSON object, no markdown fences, no explanation
@@ -509,4 +509,4 @@ export async function generateQuestionPaper(a: IAssignment): Promise<IGeneratedO
     return { ...mock, schoolName: 'SAMPLE PAPER (not AI-generated)' };
   }
   throw new Error(rejected ? `Generated paper rejected: ${rejected}` : 'All AI providers failed or are not configured');
-}
+          }
