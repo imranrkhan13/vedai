@@ -11,6 +11,7 @@ const CreateAssignmentSchema = z.object({
   subject: z.string().min(1),
   dueDate: z.string().min(1),
   questionTypes: z.array(z.string()).min(1),
+  questionPlan: z.array(z.object({ type: z.string().min(1), qty: z.number().int().min(1).max(100), marks: z.number().int().min(1).max(100) })).min(1).max(12).optional(),
   numberOfQuestions: z.number().int().min(1).max(100),
   totalMarks: z.number().min(1).max(500),
   difficulty: z.enum(['easy', 'medium', 'hard', 'mixed']).default('mixed'),
@@ -53,6 +54,14 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Validation failed', details: parsed.error.issues });
     }
     const data = parsed.data;
+    if (data.questionPlan) {
+      const q = data.questionPlan.reduce((n, r) => n + r.qty, 0);
+      const m = data.questionPlan.reduce((n, r) => n + r.qty * r.marks, 0);
+      if (q !== data.numberOfQuestions || m !== data.totalMarks) {
+        return res.status(400).json({ success: false, error: 'Validation failed', details: [{ path: ['questionPlan'], message: `Plan adds up to ${q} questions / ${m} marks, request says ${data.numberOfQuestions} / ${data.totalMarks}` }] });
+      }
+      data.questionTypes = data.questionPlan.map((r) => r.type);
+    }
     const dueDate = new Date(data.dueDate);
     if (Number.isNaN(dueDate.getTime())) {
       return res.status(400).json({ success: false, error: 'Validation failed', details: [{ path: ['dueDate'], message: 'Invalid date' }] });
