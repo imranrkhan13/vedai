@@ -1,4 +1,4 @@
-import { IAssignment, IGeneratedOutput, ISection, IQuestion } from '../models/Assignment';
+import { stripNul, IAssignment, IGeneratedOutput, ISection, IQuestion } from '../models/Assignment';
 import { v4 as uuidv4 } from 'uuid';
 
 // ── Prompt builder ────────────────────────────────────────────────────────────
@@ -20,7 +20,10 @@ RULES:
 - Total marks across ALL sections must equal exactly ${a.totalMarks}
 - Total questions across ALL sections must equal exactly ${a.numberOfQuestions}
 - Questions must be specific, academically rigorous, and about ${a.subject}
-- Each question must have: text, difficulty (easy|medium|hard), marks (number), type (string)
+- Each question must have: text, difficulty (easy|medium|hard), marks (number), type (string), answer (the correct answer or a short model answer)
+- Every MCQ question MUST also have an "options" array of exactly 4 distinct answer choices (plain text, no A/B/C/D prefixes), and its "answer" must be exactly one of those options
+- Use ONLY these question types, and use each at least once: ${a.questionTypes.join(', ')}. Set each question's "type" to the matching label (MCQ, Short, Long, Diagram, Numerical, True/False, Fill, Essay)
+- Question marks must add up to exactly ${a.totalMarks}
 - Group into logical sections: Section A = short/MCQ (1-2 marks), Section B = medium (3-5 marks), Section C = long (5-10 marks)
 
 JSON schema:
@@ -35,7 +38,7 @@ JSON schema:
       "instruction": "Attempt all questions. Each question carries N marks.",
       "totalMarks": number,
       "questions": [
-        { "text": "Full question text here", "difficulty": "easy", "marks": 1, "type": "MCQ" }
+        { "text": "Full question text here", "difficulty": "easy", "marks": 1, "type": "MCQ", "options": ["choice 1", "choice 2", "choice 3", "choice 4"], "answer": "choice 2" }
       ]
     }
   ]
@@ -48,7 +51,7 @@ async function tryGemini(prompt: string): Promise<string> {
   const key = process.env.GEMINI_API_KEY;
   if (!key || key.includes('your_')) throw new Error('No Gemini key');
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL || 'gemini-1.5-flash'}:generateContent?key=${key}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4, maxOutputTokens: 4096 } }) }
   );
@@ -59,19 +62,48 @@ async function tryGemini(prompt: string): Promise<string> {
   return text;
 }
 
+// Spend guard: only OpenRouter models whose id ends in ":free" are ever requested.
+export function resolveOpenRouterModel(env: NodeJS.ProcessEnv = process.env): string {
+  return resolveOpenRouterModels(env)[0];
+}
+
+export function resolveOpenRouterModels(env: NodeJS.ProcessEnv = process.env): string[] {
+  const list = (env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free').split(',').map((m) => m.trim()).filter(Boolean).slice(0, 3);
+  for (const m of list) if (!m.endsWith(':free')) throw new Error('OpenRouter model is not a :free model; blocked');
+  return list;
+}
+
+export function redactError(text: string, key?: string): string {
+  let t = String(text).slice(0, 300).replace(/\s+/g, ' ');
+  if (key) t = t.split(key).join('***');
+  return t.replace(/(sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)/g, '***');
+}
+
 async function tryOpenRouter(prompt: string): Promise<string> {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key || key.includes('your_')) throw new Error('No OpenRouter key');
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'HTTP-Referer': 'https://vedaai.app', 'X-Title': 'VedaAI' },
-    body: JSON.stringify({ model: 'meta-llama/llama-3.3-70b-instruct:free', messages: [{ role: 'user', content: prompt }], max_tokens: 4096, temperature: 0.4 }),
-  });
-  if (!res.ok) throw new Error(`OpenRouter ${res.status}`);
-  const data = await res.json() as any;
-  const text = data?.choices?.[0]?.message?.content;
-  if (!text) throw new Error('OpenRouter: empty');
-  return text;
+  const models = resolveOpenRouterModels(); // each is a :free model; each is tried at most once per job
+  let lastErr = 'OpenRouter: no model tried';
+  for (const model of models) {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'HTTP-Referer': 'https://vedaai.app', 'X-Title': 'VedaAI' },
+      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 4096, temperature: 0.4 }),
+    });
+    if (!res.ok) {
+      const body = redactError(await res.text().catch(() => ''), key);
+      lastErr = `OpenRouter ${model} ${res.status}: ${body}`;
+      console.warn(`[AI] ${lastErr}`);
+      if (res.status === 401 || res.status === 402 || res.status === 403) break; // auth or credits problem: stop, do not try more
+      continue;
+    }
+    const data = await res.json() as any;
+    const text = data?.choices?.[0]?.message?.content;
+    if (text) return text;
+    lastErr = `OpenRouter ${model}: empty`;
+    console.warn(`[AI] ${lastErr}`);
+  }
+  throw new Error(lastErr);
 }
 
 async function tryGroq(prompt: string): Promise<string> {
@@ -127,8 +159,19 @@ const PROVIDERS = [
   { name: 'Cohere',     fn: tryCohere },
 ];
 
+// Optional spend guard: AI_PROVIDER_ALLOWLIST=gemini limits the chain to the named providers.
+// Unset = legacy behaviour (all providers, in order).
+export function allowedProviders<T extends { name: string }>(list: T[], env: NodeJS.ProcessEnv = process.env): T[] {
+  const raw = (env.AI_PROVIDER_ALLOWLIST || '').trim();
+  if (!raw) return list;
+  const want = raw.split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+  return list.filter((p) => want.includes(p.name.toLowerCase()));
+}
+
+export function activeProviders() { return allowedProviders(PROVIDERS); }
+
 async function callWithFallback(prompt: string): Promise<string | null> {
-  for (const p of PROVIDERS) {
+  for (const p of activeProviders()) {
     try {
       console.log(`[AI] Trying ${p.name}...`);
       const result = await p.fn(prompt);
@@ -142,17 +185,61 @@ async function callWithFallback(prompt: string): Promise<string | null> {
 }
 
 // ── Parse LLM response ──────────────────────────────────────────────────────
-function parseResponse(raw: string, a: IAssignment): IGeneratedOutput {
+
+// Maps a model-returned (or requested) type label onto a canonical kind so the paper can be checked against the request.
+export function canonicalType(t: string): string {
+  const x = String(t).toLowerCase();
+  if (/true\s*\/?\s*false|true or false/.test(x)) return 'truefalse';
+  if (/mcq|multiple/.test(x)) return 'mcq';
+  if (/fill/.test(x)) return 'fill';
+  if (/diagram|graph/.test(x)) return 'diagram';
+  if (/numer/.test(x)) return 'numerical';
+  if (/essay/.test(x)) return 'essay';
+  if (/long/.test(x)) return 'long';
+  if (/short/.test(x)) return 'short';
+  return x.trim();
+}
+
+function validatePaper(sections: ISection[], a: IAssignment): void {
+  const all = sections.flatMap((sec) => sec.questions);
+  if (all.length !== a.numberOfQuestions) throw new Error(`Model returned ${all.length} questions, expected ${a.numberOfQuestions}`);
+  const requested = new Set(a.questionTypes.map(canonicalType));
+  const seen = new Set<string>();
+  all.forEach((q, i) => {
+    const kind = canonicalType(q.type);
+    if (!requested.has(kind)) throw new Error(`Question ${i + 1} has type "${q.type}" which was not requested`);
+    seen.add(kind);
+    if (kind === 'mcq') {
+      if (!q.options || q.options.length !== 4) throw new Error(`MCQ ${i + 1} must have exactly 4 options`);
+      const norm = (v: string) => v.trim().toLowerCase();
+      if (new Set(q.options.map(norm)).size !== 4) throw new Error(`MCQ ${i + 1} has duplicate options`);
+      if (!q.answer || !q.options.some((o) => norm(o) === norm(q.answer as string))) throw new Error(`MCQ ${i + 1} answer is not one of its options`);
+    }
+    if (kind === 'truefalse' && !/^(true|false)\b/i.test(q.answer || '')) throw new Error(`True/False question ${i + 1} needs a True or False answer`);
+  });
+  for (const k of requested) if (!seen.has(k)) throw new Error(`No question of requested type "${k}" was returned`);
+  const marks = all.reduce((n, q) => n + q.marks, 0);
+  if (marks !== a.totalMarks) throw new Error(`Questions add up to ${marks} marks, expected ${a.totalMarks}`);
+}
+
+export function parseResponse(raw: string, a: IAssignment): IGeneratedOutput {
   const cleaned = raw.replace(/```json\n?|```\n?/g, '').trim();
   const parsed = JSON.parse(cleaned);
   const sections: ISection[] = (parsed.sections || []).map((sec: any) => {
-    const questions: IQuestion[] = (sec.questions || []).map((q: any) => ({
-      id: uuidv4(), text: q.text || '', difficulty: q.difficulty || 'medium',
-      marks: Number(q.marks) || 1, type: q.type || 'short',
-    }));
+    const questions: IQuestion[] = (sec.questions || []).map((q: any) => {
+      const type = String(q.type || 'short');
+      const text = stripNul(String(q.text || '')).trim();
+      if (!text) throw new Error('Model returned a question with no text');
+      const out: IQuestion = { id: uuidv4(), text, difficulty: ['easy', 'medium', 'hard'].includes(q.difficulty) ? q.difficulty : 'medium', marks: Number(q.marks) || 1, type };
+      if (Array.isArray(q.options)) out.options = q.options.map((o: any) => stripNul(String(o)).trim()).filter(Boolean);
+      if (q.answer !== undefined && q.answer !== null && String(q.answer).trim()) out.answer = stripNul(String(q.answer)).trim();
+      if (canonicalType(type) === 'mcq' && (!out.options || out.options.length < 2)) throw new Error('Model returned an MCQ without answer choices');
+      return out;
+    });
     return { title: sec.title || 'Section', instruction: sec.instruction || 'Attempt all questions.', questions, totalMarks: questions.reduce((s, q) => s + q.marks, 0) };
   });
-  return { subject: parsed.subject || a.subject, totalMarks: parsed.totalMarks || a.totalMarks, duration: parsed.duration || '2 hours', grade: parsed.grade || '', sections, generatedAt: new Date() };
+  validatePaper(sections, a);
+  return { subject: parsed.subject || a.subject, totalMarks: sections.reduce((n, sec) => n + sec.totalMarks, 0), duration: parsed.duration || '2 hours', grade: parsed.grade || '', sections, generatedAt: new Date() };
 }
 
 // ── High-quality subject-aware mock ─────────────────────────────────────────
@@ -378,14 +465,22 @@ export async function generateQuestionPaper(a: IAssignment): Promise<IGeneratedO
   const prompt = buildPrompt(a);
   const raw = await callWithFallback(prompt);
 
+  let rejected = '';
   if (raw) {
     try {
       return parseResponse(raw, a);
     } catch (parseErr) {
-      console.warn('[AI] Parse failed, using mock:', parseErr);
+      rejected = parseErr instanceof Error ? parseErr.message : String(parseErr);
+      console.warn('[AI] Generated paper rejected:', rejected);
     }
   }
 
-  console.log('[AI] Using high-quality mock generator');
-  return buildMockOutput(a);
+  // Fail honestly by default. Demo mode (ALLOW_MOCK_OUTPUT=true) keeps the old sample paper,
+  // clearly labelled so it cannot be mistaken for AI output.
+  if (process.env.ALLOW_MOCK_OUTPUT === 'true') {
+    console.log('[AI] ALLOW_MOCK_OUTPUT=true: returning labelled sample paper');
+    const mock = buildMockOutput(a);
+    return { ...mock, schoolName: 'SAMPLE PAPER (not AI-generated)' };
+  }
+  throw new Error(rejected ? `Generated paper rejected: ${rejected}` : 'All AI providers failed or are not configured');
 }

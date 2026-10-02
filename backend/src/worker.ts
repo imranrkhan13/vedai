@@ -11,15 +11,14 @@ import { Assignment } from './models/Assignment';
 import { generateQuestionPaper } from './services/aiGenerator';
 import { notifyClient } from './services/websocket';
 
-async function processAssignmentJob(job: Job) {
+export async function processAssignmentJob(job: Job) {
   const { assignmentId, clientId } = job.data;
   console.log(`Processing job ${job.id} for assignment ${assignmentId}`);
 
   const assignment = await Assignment.findById(assignmentId);
   if (!assignment) throw new Error(`Assignment ${assignmentId} not found`);
 
-  assignment.status = 'processing';
-  await assignment.save();
+  await Assignment.setProcessing(assignmentId);
 
   if (clientId) {
     notifyClient(clientId, { type: 'job:progress', assignmentId, status: 'processing', message: 'Generating your question paper...', progress: 20 });
@@ -34,9 +33,7 @@ async function processAssignmentJob(job: Job) {
   const output = await generateQuestionPaper(assignment);
   await job.updateProgress(90);
 
-  assignment.status = 'completed';
-  assignment.output = output;
-  await assignment.save();
+  await Assignment.setCompleted(assignmentId, output);
 
   await job.updateProgress(100);
 
@@ -47,12 +44,17 @@ async function processAssignmentJob(job: Job) {
   return { assignmentId, status: 'completed' };
 }
 
-async function startWorker() {
-  await connectDB();
+// Opt-in only: the web process runs the queue worker when WORKER_IN_WEB=true (default off).
+export function shouldRunWorkerInWeb(env: NodeJS.ProcessEnv = process.env): boolean {
+  return String(env.WORKER_IN_WEB || '').toLowerCase() === 'true';
+}
+
+export async function startWorker(opts: { connect?: boolean } = {}) {
+  if (opts.connect !== false) await connectDB();
 
   const worker = new Worker('assignment-generation', processAssignmentJob, {
     connection: getRedis(),
-    concurrency: 3,
+    concurrency: Math.max(1, parseInt(process.env.WORKER_CONCURRENCY || '1', 10) || 1),
   });
 
   worker.on('completed', (job) => console.log(`✅ Job ${job.id} completed`));
@@ -60,7 +62,7 @@ async function startWorker() {
   worker.on('failed', async (job, err) => {
     console.error(`❌ Job ${job?.id} failed:`, err.message);
     if (job?.data?.assignmentId) {
-      await Assignment.findByIdAndUpdate(job.data.assignmentId, { status: 'failed', error: err.message });
+      await Assignment.setFailed(job.data.assignmentId, err.message);
       if (job.data.clientId) {
         notifyClient(job.data.clientId, { type: 'job:failed', assignmentId: job.data.assignmentId, status: 'failed', message: 'Generation failed. Please try again.' });
       }
@@ -70,4 +72,6 @@ async function startWorker() {
   console.log('🔄 Worker started and listening for jobs...');
 }
 
-startWorker().catch(console.error);
+if (require.main === module) {
+  startWorker().catch(console.error);
+}

@@ -1,3 +1,4 @@
+import { redactSecrets } from './redact';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { getRedis } from './redis';
@@ -32,8 +33,10 @@ export function initWebSocket(server: Server) {
       tls: isTLS ? { rejectUnauthorized: false } : undefined,
     });
 
+    sub.on('error', (err) => console.error('❌ Redis pub/sub error:', redactSecrets(err.message)));
+
     sub.subscribe('ws:notify', (err) => {
-      if (err) console.error('Redis subscribe error:', err.message);
+      if (err) console.error('Redis subscribe error:', redactSecrets(err.message));
       else console.log('✅ WebSocket + Redis pub/sub initialized');
     });
 
@@ -49,7 +52,7 @@ export function initWebSocket(server: Server) {
       } catch {}
     });
   } catch (err) {
-    console.error('Redis pub/sub init failed:', err);
+    console.error('Redis pub/sub init failed:', redactSecrets(err));
   }
 }
 

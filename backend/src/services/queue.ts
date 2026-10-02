@@ -9,7 +9,7 @@ export function getAssignmentQueue(): Queue {
     assignmentQueue = new Queue('assignment-generation', {
       connection,
       defaultJobOptions: {
-        attempts: 3,
+        attempts: Math.max(1, parseInt(process.env.QUEUE_ATTEMPTS || '3', 10) || 3),
         backoff: { type: 'exponential', delay: 2000 },
         removeOnComplete: 100,
         removeOnFail: 50,

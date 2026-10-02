@@ -50,7 +50,7 @@ export default function OutputPage() {
   const handleCopy = async () => {
     if(!currentAssignment?.output) return;
     const lines:string[] = [currentAssignment.title,`Subject: ${currentAssignment.output.subject}`,`Total Marks: ${currentAssignment.output.totalMarks}`,'',
-      ...currentAssignment.output.sections.flatMap((s:Section)=>[`\n${s.title}`,s.instruction,'', ...s.questions.map((q:Question,i:number)=>`${i+1}. [${DIFF_LABEL[q.difficulty]||q.difficulty}] ${q.text} [${q.marks} Marks]`)])];
+      ...currentAssignment.output.sections.flatMap((s:Section)=>[`\n${s.title}`,s.instruction,'', ...s.questions.map((q:Question,i:number)=>`${i+1}. [${DIFF_LABEL[q.difficulty]||q.difficulty}] ${q.text} [${q.marks} Marks]${q.options&&q.options.length?'\n'+q.options.map((o:string,oi:number)=>`   (${String.fromCharCode(97+oi)}) ${o}`).join('\n'):''}`)])];
     await navigator.clipboard.writeText(lines.join('\n'));
     setCopied(true); setTimeout(()=>setCopied(false),2000);
     toast.success('Copied to clipboard!');
@@ -188,7 +188,7 @@ export default function OutputPage() {
               {/* Paper */}
               <div ref={printRef} style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:12, maxWidth:760, overflow:'hidden', boxShadow:'var(--shadow-sm)' }}>
                 <div style={{ textAlign:'center', padding:'28px 48px 20px', borderBottom:'2.5px solid var(--black)' }}>
-                  <h2 style={{ fontSize:17, fontWeight:700, color:'var(--black)', marginBottom:4 }}>Delhi Public School, Sector-4, Bokaro</h2>
+                  <h2 style={{ fontSize:17, fontWeight:700, color:'var(--black)', marginBottom:4 }}>{a.output.schoolName||a.title}</h2>
                   <p style={{ fontSize:14, color:'var(--gray-700)', marginBottom:2 }}>Subject: {a.output.subject}</p>
                   {a.output.grade&&<p style={{ fontSize:13, color:'var(--gray-500)' }}>Class: {a.output.grade}</p>}
                 </div>
@@ -200,7 +200,7 @@ export default function OutputPage() {
                   <p style={{ fontSize:13, color:'var(--gray-700)', fontStyle:'italic' }}>All questions are compulsory unless stated otherwise.</p>
                 </div>
                 <div style={{ padding:'14px 48px', borderBottom:'2.5px solid var(--black)', display:'flex', flexDirection:'column', gap:7 }}>
-                  {[{ label:'Name:', val:studentName, set:setStudentName, w:220 },{ label:'Roll Number:', val:rollNo, set:setRollNo, w:130 },{ label:`Class: ${a.output.grade||'5th'} Section:`, val:sectionVal, set:setSectionVal, w:80 }].map(({ label,val,set,w })=>(
+                  {[{ label:'Name:', val:studentName, set:setStudentName, w:220 },{ label:'Roll Number:', val:rollNo, set:setRollNo, w:130 },{ label:(a.output.grade?`Class ${a.output.grade}, Section:`:'Class / Section:'), val:sectionVal, set:setSectionVal, w:80 }].map(({ label,val,set,w })=>(
                     <div key={label} style={{ display:'flex', alignItems:'center', gap:8, fontSize:13 }}>
                       <span style={{ color:'var(--gray-700)', fontWeight:500, minWidth:100 }}>{label}</span>
                       <input value={val} onChange={e=>set(e.target.value)}
@@ -215,7 +215,6 @@ export default function OutputPage() {
                     <div key={si} style={{ paddingTop:22, paddingBottom:8, borderBottom:si<a.output!.sections.length-1?'1px dashed var(--border)':'none' }}>
                       <h3 style={{ fontSize:15, fontWeight:700, color:'var(--black)', textAlign:'center', marginBottom:2 }}>{sec.title}</h3>
                       <p style={{ fontSize:12, color:'var(--gray-500)', fontStyle:'italic', textAlign:'center', marginBottom:2 }}>{sec.instruction}</p>
-                      {sec.questions[0]&&<p style={{ fontSize:12, color:'var(--gray-500)', textAlign:'center', marginBottom:16 }}>Each question carries {sec.questions[0].marks} mark{sec.questions[0].marks>1?'s':''}.</p>}
                       <ol style={{ listStyle:'none', padding:0 }}>
                         {sec.questions.map((q:Question,qi:number)=>(
                           <li key={q.id||qi} style={{ display:'flex', gap:8, marginBottom:12, fontSize:13, color:'var(--black)', lineHeight:1.6 }}>
@@ -224,6 +223,11 @@ export default function OutputPage() {
                               <span style={{ color:'var(--gray-500)' }}>[{DIFF_LABEL[q.difficulty]||q.difficulty}] </span>
                               {q.text}
                               <span style={{ fontWeight:600, color:'var(--gray-700)' }}> [{q.marks} Mark{q.marks>1?'s':''}]</span>
+                              {q.options&&q.options.length>0&&(
+                                <ol style={{ listStyle:'none', padding:0, margin:'6px 0 0' }}>
+                                  {q.options.map((o:string,oi:number)=>(<li key={oi} style={{ marginBottom:2 }}>({String.fromCharCode(97+oi)}) {o}</li>))}
+                                </ol>
+                              )}
                             </span>
                           </li>
                         ))}
@@ -233,19 +237,21 @@ export default function OutputPage() {
                   <div style={{ textAlign:'center', padding:'16px 0', borderTop:'1px solid var(--border)', marginTop:8 }}>
                     <p style={{ fontSize:13, fontWeight:700, color:'var(--black)' }}>End of Question Paper</p>
                   </div>
+                  {a.output.sections.some((sec:Section)=>sec.questions.some((q:Question)=>q.answer))&&(
                   <div style={{ padding:'20px 0', borderTop:'2px solid var(--black)' }}>
                     <h3 style={{ fontSize:14, fontWeight:700, color:'var(--black)', marginBottom:14 }}>Answer Key:</h3>
                     <ol style={{ listStyle:'none', padding:0 }}>
-                      {a.output.sections.flatMap((sec:Section)=>sec.questions).map((q:Question,i:number)=>(
+                      {a.output.sections.flatMap((sec:Section)=>sec.questions).map((q:Question,i:number)=>q.answer?(
                         <li key={i} style={{ display:'flex', gap:8, marginBottom:8, fontSize:13, lineHeight:1.6 }}>
                           <span style={{ fontWeight:600, minWidth:22, flexShrink:0, color:'var(--gray-700)' }}>{i+1}.</span>
-                          <span style={{ color:'var(--gray-500)', fontStyle:'italic' }}>
-                            {q.difficulty==='easy'?`Basic understanding of ${a.subject.toLowerCase()} concepts.`:q.difficulty==='hard'?`Advanced analysis and application in ${a.subject.toLowerCase()}.`:`Core application of ${a.subject.toLowerCase()} principles.`}
+                          <span style={{ color:'var(--gray-700)' }}>
+                            {q.answer}
                           </span>
                         </li>
-                      ))}
+                      ):null)}
                     </ol>
                   </div>
+                  )}
                 </div>
               </div>
 

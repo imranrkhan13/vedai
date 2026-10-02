@@ -1,3 +1,4 @@
+import { shouldRunWorkerInWeb, startWorker } from './worker';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -70,6 +71,11 @@ async function start() {
     console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV}`);
     console.log(`🌍 FRONTEND_URL: ${process.env.FRONTEND_URL}`);
   });
+  if (shouldRunWorkerInWeb()) {
+    await startWorker({ connect: false });
+  } else {
+    console.log('ℹ️ Queue worker not started in web process (set WORKER_IN_WEB=true to enable)');
+  }
 }
 
 start().catch(console.error);
