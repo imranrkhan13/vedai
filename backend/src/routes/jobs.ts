@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { getAssignmentQueue } from '../services/queue';
+import { requireAuth } from '../services/auth';
+import { Assignment } from '../models/Assignment';
 
 const router = Router();
+router.use(requireAuth);
 
 router.get('/:jobId', async (req: Request, res: Response) => {
   try {
@@ -9,6 +12,7 @@ router.get('/:jobId', async (req: Request, res: Response) => {
     const queue = getAssignmentQueue();
     const job = await queue.getJob(jobId);
     if (!job) return res.status(404).json({ success: false, error: 'Job not found' });
+    if (!(await Assignment.findById(String(job.data?.assignmentId), req.userId!))) return res.status(404).json({ success: false, error: 'Job not found' });
 
     const state = await job.getState();
     return res.json({
