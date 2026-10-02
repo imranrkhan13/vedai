@@ -195,7 +195,7 @@ export default function CreatePage() {
 
           {/* Question types card */}
           <div className="card fade-up" style={{ padding:'20px 22px', marginBottom:14 }}>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 120px 100px 36px', gap:8, marginBottom:10, padding:'0 4px' }}>
+            <div className="qgrid qhead" style={{ display:'grid', gap:8, marginBottom:10, padding:'0 4px' }}>
               <span style={{ fontSize:12, fontWeight:600, color:'var(--gray-500)' }}>Question Type</span>
               <span style={{ fontSize:12, fontWeight:600, color:'var(--gray-500)', textAlign:'center' }}>No. of Questions</span>
               <span style={{ fontSize:12, fontWeight:600, color:'var(--gray-500)', textAlign:'center' }}>Marks</span>
@@ -204,14 +204,16 @@ export default function CreatePage() {
             {errors.qRows&&<p style={{ color:'var(--red)', fontSize:12, marginBottom:8 }}>{errors.qRows}</p>}
             <div className="stagger">
               {qRows.map((row,i)=>(
-                <div key={i} className="fade-up" style={{ display:'grid', gridTemplateColumns:'1fr 120px 100px 36px', gap:8, marginBottom:8, alignItems:'center' }}>
+                <div key={i} className="fade-up qgrid" style={{ display:'grid', gap:8, marginBottom:8, alignItems:'center' }}>
                   <select className="input" value={row.type} onChange={e=>updateRow(i,'type',e.target.value)} style={{ height:36, fontSize:13, padding:'0 28px 0 10px' }}>
                     {Q_TYPES.map(t=><option key={t}>{t}</option>)}
                   </select>
-                  <div style={{ display:'flex', justifyContent:'center' }}>
+                  <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:6 }}>
+                    <span className="mlabel">Questions</span>
                     <Stepper value={row.qty} onChange={v=>updateRow(i,'qty',v)}/>
                   </div>
-                  <div style={{ display:'flex', justifyContent:'center' }}>
+                  <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:6 }}>
+                    <span className="mlabel">Marks</span>
                     <Stepper value={row.marks} onChange={v=>updateRow(i,'marks',v)}/>
                   </div>
                   <button onClick={()=>removeRow(i)}
