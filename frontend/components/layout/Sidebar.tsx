@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import { useAssignmentStore } from '@/store/assignmentStore';
 import { Home, BookOpen, Library, Sparkles, Settings, Menu, X } from 'lucide-react';
 
 const NAV = [
@@ -13,6 +14,7 @@ const NAV = [
 
 function SidebarContent({ onClose }: { onClose?: () => void }) {
   const path = usePathname();
+  const count = useAssignmentStore(s => s.assignments.length);
   return (
     <div style={{ width: 248, height: '100%', background: '#fff', borderRight: '1px solid #EBEBEB', display: 'flex', flexDirection: 'column', padding: '16px 12px' }}>
       {/* Logo */}
@@ -42,8 +44,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
               style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8, marginBottom: 2, fontSize: 13, cursor: 'pointer', textDecoration: 'none', transition: 'all 0.15s', color: active ? '#F97316' : '#6B7280', fontWeight: active ? 600 : 400, background: active ? '#FFF4EE' : 'transparent', position: 'relative' }}>
               <Icon size={16} />
               <span style={{ flex: 1 }}>{label}</span>
-              {label === 'Assignments' && (
-                <span style={{ background: '#F97316', color: '#fff', borderRadius: 20, fontSize: 10, fontWeight: 700, padding: '1px 6px', lineHeight: 1.6 }}>10</span>
+              {label === 'Assignments' && count > 0 && (
+                <span style={{ background: '#F97316', color: '#fff', borderRadius: 20, fontSize: 10, fontWeight: 700, padding: '1px 6px', lineHeight: 1.6 }}>{count}</span>
               )}
             </Link>
           );
@@ -60,10 +62,10 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 9, background: '#F9FAFB', border: '1px solid #F3F4F6', cursor: 'pointer', transition: 'all 0.15s' }}
           onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#F97316'; (e.currentTarget as HTMLDivElement).style.background = '#FFF4EE'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#F3F4F6'; (e.currentTarget as HTMLDivElement).style.background = '#F9FAFB'; }}>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#F97316,#FB923C)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12, flexShrink: 0, boxShadow: '0 2px 6px rgba(249,115,22,0.3)' }}>JD</div>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#F97316,#FB923C)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12, flexShrink: 0, boxShadow: '0 2px 6px rgba(249,115,22,0.3)' }}>V</div>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#1A1A1A' }}>Delhi Public School</div>
-            <div style={{ fontSize: 11, color: '#9CA3AF' }}>Bokaro Steel City</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#1A1A1A' }}>VedaAI</div>
+            <div style={{ fontSize: 11, color: '#9CA3AF' }}>Question paper generator</div>
           </div>
         </div>
       </div>
