@@ -34,7 +34,7 @@ app.use(cors({
     // Allow requests with no origin (mobile apps, curl, Render health checks)
     if (!origin) return callback(null, true);
     // Allow any vercel.app domain for this project
-    if (/^https:\/\/vedai[a-z0-9-]*\.vercel\.app$/.test(origin) || /^http:\/\/localhost(:\d+)?$/.test(origin) || allowedOrigins.includes(origin)) {
+    if (/^https:\/\/(vedai|quillix)[a-z0-9-]*\.vercel\.app$/.test(origin) || /^http:\/\/localhost(:\d+)?$/.test(origin) || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     callback(new Error(`CORS blocked: ${origin}`));
