@@ -39,6 +39,9 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
   r = await j('/' + id); ok(r.body.data._id === id && r.body.data.status === 'pending' && r.body.data.jobId === '1', 'get pending, jobId stored');
   ok(r.body.data.dueDate.startsWith('2026-10-15') && Array.isArray(r.body.data.questionTypes), 'frontend fields: dueDate ISO, questionTypes array');
 
+  // honest failure when no provider works (default)
+  await processAssignmentJob({ id: '0', data: jobs[0].data, updateProgress: async () => {} } as any).then(() => assert.fail('should throw'), (e) => { ok(/AI providers/.test(e.message), 'no-provider run throws'); });
+  process.env.ALLOW_MOCK_OUTPUT = 'true';
   await processAssignmentJob({ id: '1', data: jobs[0].data, updateProgress: async () => {} } as any); // worker persistence, mock paper (no keys)
   ok(notices.some(([c, p]) => c === 'c1' && p.type === 'job:completed'), 'worker notified completion');
   r = await j('/' + id);
@@ -47,6 +50,8 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
   ok(typeof o.sections[0].title === 'string' && Array.isArray(o.sections[0].questions) && o.sections[0].questions[0].difficulty && typeof o.sections[0].questions[0].marks === 'number', 'output matches frontend Section/Question types');
   ok(typeof o.generatedAt === 'string' && o.totalMarks > 0, 'generatedAt string, totalMarks');
   ok(cache.has('assignment:' + id), 'completed result cached');
+  ok(o.schoolName === 'SAMPLE PAPER (not AI-generated)', 'mock output is labelled');
+  delete process.env.ALLOW_MOCK_OUTPUT;
 
   r = await j(''); ok(r.body.data.length === 1 && r.body.data[0]._id === id && r.body.data[0].output === undefined, 'list shape, no output');
 
@@ -59,7 +64,9 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
   r = await j('/' + id, { method: 'DELETE' }); ok(r.body.success, 'delete ok');
   r = await j('/' + id); ok(r.status === 404, 'deleted -> 404');
   ok(!shouldRunWorkerInWeb({} as any) && !shouldRunWorkerInWeb({ WORKER_IN_WEB: 'false' } as any) && !shouldRunWorkerInWeb({ WORKER_IN_WEB: '1' } as any), 'worker-in-web off by default');
-  const { allowedProviders } = await import('../src/services/aiGenerator');
+  const { allowedProviders, resolveOpenRouterModel } = await import('../src/services/aiGenerator');
+  ok(resolveOpenRouterModel({ OPENROUTER_MODEL: 'google/gemma-4-31b-it:free' } as any) === 'google/gemma-4-31b-it:free' && resolveOpenRouterModel({} as any).endsWith(':free'), 'openrouter free model accepted/default is free');
+  assert.throws(() => resolveOpenRouterModel({ OPENROUTER_MODEL: 'meta-llama/llama-3.3-70b-instruct' } as any)); n++;
   const L = [{ name: 'Groq' }, { name: 'Gemini' }, { name: 'Cohere' }];
   ok(allowedProviders(L, {} as any).length === 3 && allowedProviders(L, { AI_PROVIDER_ALLOWLIST: ' gemini ' } as any).map((x) => x.name).join() === 'Gemini' && allowedProviders(L, { AI_PROVIDER_ALLOWLIST: 'none' } as any).length === 0, 'provider allowlist: unset=all, named=only those');
   ok(shouldRunWorkerInWeb({ WORKER_IN_WEB: 'true' } as any), 'worker-in-web only with explicit true');
