@@ -18,6 +18,7 @@ export interface IQuestion {
   type: string;
   options?: string[];
   answer?: string;
+  concept?: string;
 }
 
 export interface ISection {
