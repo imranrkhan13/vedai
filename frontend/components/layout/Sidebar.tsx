@@ -22,7 +22,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         <Link href="/home" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none' }}>
           <div style={{ width: 32, height: 32, borderRadius: 9, background: '#F97316', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 16, boxShadow: '0 2px 8px rgba(249,115,22,0.35)', transition: 'transform 0.2s' }}
             onMouseEnter={e => (e.currentTarget.style.transform = 'rotate(-5deg) scale(1.08)')}
-            onMouseLeave={e => (e.currentTarget.style.transform = 'none')}>V</div>
+            onMouseLeave={e => (e.currentTarget.style.transform = 'none')}>Q</div>
           <span style={{ fontSize: 17, fontWeight: 700, color: '#1A1A1A', letterSpacing: '-0.3px' }}>Quillix</span>
         </Link>
         {onClose && <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 4 }}><X size={16} /></button>}
@@ -62,7 +62,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 9, background: '#F9FAFB', border: '1px solid #F3F4F6', cursor: 'pointer', transition: 'all 0.15s' }}
           onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#F97316'; (e.currentTarget as HTMLDivElement).style.background = '#FFF4EE'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#F3F4F6'; (e.currentTarget as HTMLDivElement).style.background = '#F9FAFB'; }}>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#F97316,#FB923C)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12, flexShrink: 0, boxShadow: '0 2px 6px rgba(249,115,22,0.3)' }}>V</div>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#F97316,#FB923C)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12, flexShrink: 0, boxShadow: '0 2px 6px rgba(249,115,22,0.3)' }}>Q</div>
           <div>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#1A1A1A' }}>Quillix</div>
             <div style={{ fontSize: 11, color: '#9CA3AF' }}>Question paper generator</div>
