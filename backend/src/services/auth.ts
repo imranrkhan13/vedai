@@ -49,13 +49,13 @@ declare module 'express-serve-static-core' { interface Request { userId?: string
 
 export const COOKIE = 'qx_session';
 const WEEK = 7 * 24 * 3600;
-const secureCookie = () => process.env.NODE_ENV === 'production' || process.env.COOKIE_SECURE === 'true';
+const secureCookie = (req: Request) => process.env.NODE_ENV === 'production' || process.env.COOKIE_SECURE === 'true' || String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https';
 
-export function setSession(res: Response, uid: string) {
-  res.setHeader('Set-Cookie', `${COOKIE}=${signToken(uid)}; Max-Age=${WEEK}; Path=/; HttpOnly; SameSite=Lax${secureCookie() ? '; Secure' : ''}`);
+export function setSession(req: Request, res: Response, uid: string) {
+  res.setHeader('Set-Cookie', `${COOKIE}=${signToken(uid)}; Max-Age=${WEEK}; Path=/; HttpOnly; SameSite=Lax${secureCookie(req) ? '; Secure' : ''}`);
 }
-export function clearSession(res: Response) {
-  res.setHeader('Set-Cookie', `${COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax${secureCookie() ? '; Secure' : ''}`);
+export function clearSession(req: Request, res: Response) {
+  res.setHeader('Set-Cookie', `${COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax${secureCookie(req) ? '; Secure' : ''}`);
 }
 function cookieToken(req: Request): string | null {
   for (const part of (req.headers.cookie || '').split(';')) {
