@@ -111,6 +111,17 @@ const realFetch = globalThis.fetch;
   // delete student removes access
   r = await t(T1, 'DELETE', `/roster/${A}/${row2}`); ok(r.status === 200, 'student removed');
 
+  // paper delete cascades to students and submissions and ends sessions; another owner's delete does nothing
+  r = await t(T1, 'POST', `/roster/${A}`, { studentId: 'D1' }); const dc = r.body.data.accessCode as string;
+  cookie = ''; await s('POST', '/student/login', { studentId: 'D1', accessCode: dc }); const dCookie = cookie;
+  await s('POST', '/student/submit', { answers: { q1: 'to be deleted' } }, true, dCookie);
+  ok(await Assignment.deleteById(A, T2) === false, 'other owner cannot delete my paper');
+  ok((await pg.query('SELECT 1 FROM vedai_students WHERE assignment_id=$1', [A])).rows.length >= 1, 'roster untouched by a failed delete');
+  ok(await Assignment.deleteById(A, T1) === true, 'owner deletes paper');
+  ok((await pg.query('SELECT 1 FROM vedai_students WHERE assignment_id=$1', [A])).rows.length === 0, 'students deleted with the paper');
+  ok((await pg.query('SELECT 1 FROM vedai_submissions WHERE assignment_id=$1', [A])).rows.length === 0, 'submissions deleted with the paper');
+  ok((await s('GET', '/student/me', undefined, true, dCookie)).status === 401, 'student session ends after the paper is deleted');
+  ok((await pg.query('SELECT 1 FROM vedai_students WHERE assignment_id=$1', [B])).rows.length === 1, 'other teacher roster untouched');
   ok(outbound === 0, 'no outbound network call at any point (no AI provider calls)');
   srv.close(); console.log(`student portal: ${n} assertions passed`); process.exit(0);
 })().catch((e) => { console.error(e); process.exit(1); });
