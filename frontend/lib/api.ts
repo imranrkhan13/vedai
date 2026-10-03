@@ -15,7 +15,7 @@ async function fetchAPI<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
   });
   const data = await res.json();
-  if (res.status === 401 && !path.startsWith('/auth/') && typeof window !== 'undefined') {
+  if (res.status === 401 && !path.startsWith('/auth/') && !path.startsWith('/student') && typeof window !== 'undefined') {
     auth.clear();
     window.location.href = '/login';
   }
@@ -51,6 +51,17 @@ export const api = {
     fetchAPI(`/assignments/${id}/grade`, { method: 'POST', body: JSON.stringify({ questionId, fixture, overwrite }) }),
   saveGrade: (id: string, questionId: string, marks: number, reason: string) =>
     fetchAPI(`/assignments/${id}/grade`, { method: 'PATCH', body: JSON.stringify({ questionId, marks, reason }) }),
+  rosterList: (aid: string) => fetchAPI<{ totalMarks: number; students: { id: string; studentId: string; name: string; submitted: boolean; submittedAt: string | null; late: boolean; released: boolean; markedTotal: number | null }[] }>(`/roster/${aid}`),
+  rosterAdd: (aid: string, studentId: string, name: string) => fetchAPI<{ id: string; studentId: string; accessCode: string }>(`/roster/${aid}`, { method: 'POST', body: JSON.stringify({ studentId, name: name || undefined }) }),
+  rosterReset: (aid: string, sid: string) => fetchAPI<{ accessCode: string }>(`/roster/${aid}/${sid}/reset`, { method: 'POST', body: '{}' }),
+  rosterRemove: (aid: string, sid: string) => fetchAPI(`/roster/${aid}/${sid}`, { method: 'DELETE' }),
+  rosterSubmission: (aid: string, sid: string) => fetchAPI<any>(`/roster/${aid}/${sid}`),
+  rosterMark: (aid: string, sid: string, questionId: string, marks: number, reason: string) => fetchAPI<{ total: number }>(`/roster/${aid}/${sid}/marks`, { method: 'PATCH', body: JSON.stringify({ questionId, marks, reason }) }),
+  rosterRelease: (aid: string, sid: string, released: boolean) => fetchAPI(`/roster/${aid}/${sid}/release`, { method: 'POST', body: JSON.stringify({ released }) }),
+  studentLogin: (studentId: string, accessCode: string) => fetchAPI<{ student: { studentId: string; name: string } }>('/student/login', { method: 'POST', body: JSON.stringify({ studentId, accessCode }) }),
+  studentMe: () => fetchAPI<any>('/student/me'),
+  studentSubmit: (answers: Record<string, string>) => fetchAPI<{ submitted: boolean; late: boolean }>('/student/submit', { method: 'POST', body: JSON.stringify({ answers }) }),
+  studentLogout: () => fetchAPI('/student/logout', { method: 'POST', body: '{}' }),
   deleteAssignment: (id: string) =>
     fetchAPI(`/assignments/${id}`, { method: 'DELETE' }),
 };
