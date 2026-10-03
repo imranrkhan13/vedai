@@ -68,6 +68,14 @@ export default function StudentPage() {
           {submitted && sub.marks && <p style={{ fontSize: 13, fontWeight: 600, marginTop: 8 }}>Your teacher marked this: {sub.total} / {a.totalMarks}</p>}
           {submitted && !sub.marks && <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 8 }}>Your teacher has not shared marks yet.</p>}
         </div>
+        {me.student.ageGroup === 'adult' && (
+          <div className="card" style={{ padding: '12px 20px', marginBottom: 10 }}>
+            <label style={{ display: 'flex', gap: 8, fontSize: 12, alignItems: 'flex-start', cursor: 'pointer' }}>
+              <input type="checkbox" checked={!!me.student.aiConsent} onChange={async e => { try { await api.studentConsent(e.target.checked); await load(); } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Could not save'); } }} />
+              <span>I agree that my typed answers may be sent to an outside AI service (Typesafe) to draft a grade for my teacher. This only records your choice. Right now no typed answers are sent, and your teacher still decides your marks. You can change this any time.</span>
+            </label>
+          </div>
+        )}
         {qs.map(q => (
           <div key={q.id} className="card" style={{ padding: '14px 20px', marginBottom: 10 }}>
             <p style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.6 }}>{q.number}. {q.text} <span style={{ color: 'var(--gray-500)', fontWeight: 500 }}>[{q.marks} mark{q.marks > 1 ? 's' : ''}]</span></p>
@@ -83,6 +91,7 @@ export default function StudentPage() {
             {(q.options.length === 0 || submitted) && (
               <textarea className="input" value={val(q)} readOnly={submitted} onChange={e => setAns({ ...ans, [q.id]: e.target.value })} maxLength={5000} placeholder={submitted ? '' : 'Type your answer'} style={{ minHeight: submitted ? 60 : 100, fontSize: 13, marginTop: 8 }} aria-label={`Answer to question ${q.number}`} />
             )}
+            {sub.feedback && sub.feedback[q.id] && <p style={{ fontSize: 12, marginTop: 6, color: 'var(--gray-500)' }}>{sub.feedback[q.id].text}</p>}
             {sub.marks && sub.marks[q.id] && (
               <p style={{ fontSize: 12, marginTop: 8 }}><b>Marks: {sub.marks[q.id].marks} / {q.marks}</b>{sub.marks[q.id].reason ? ` - ${sub.marks[q.id].reason}` : ''}</p>
             )}
