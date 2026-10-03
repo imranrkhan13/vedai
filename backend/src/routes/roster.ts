@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { getDb } from '../services/db';
 import { Assignment, IQuestion } from '../models/Assignment';
 import { requireAuth, signToken, verifyToken } from '../services/auth';
-import { jevEnabled, jevKeyReady, JEV_FIXTURES, JEV_MAX_PER_PAPER, takeDailySlot, jevScore, jevBody, DEMO_KEY_POINTS, checklist, PILOT_MAX_CALLS, PILOT_MAX_USD, PILOT_RESERVE_USD, estCostUsd, keyPointsFromKey, checklistFrom } from '../services/jev';
+import { jevEnabled, jevKeyReady, JEV_FIXTURES, JEV_MAX_PER_PAPER, takeDailySlot, jevScore, jevBody, DEMO_KEY_POINTS, checklist, PILOT_MAX_CALLS, PILOT_MAX_USD, PILOT_RESERVE_USD, estCostUsd, jevNoulOne, keyPointsFromKey, checklistFrom } from '../services/jev';
 import { cleanAgeGroup, feedbackFor, realAnswerAiGate } from '../services/feedback';
 import { getRedis } from '../services/redis';
 
@@ -206,6 +206,7 @@ export function pilotEligible(student: any, a: any, q: IQuestion, answer: string
   if (answer.trim().length < 10 || answer.length > 2000) return { ok: false, why: 'Answer too short or too long for the pilot.' };
   return { ok: true };
 }
+const PILOT_CHECKS = 3;
 async function runPilotDraft(student: any, q: IQuestion, answer: string): Promise<void> {
   const save = async (d: any) => { await getDb().query("UPDATE vedai_submissions SET draft = jsonb_set(draft, ARRAY[$2]::text[], $3::jsonb), updated_at=now() WHERE student_row_id=$1", [student.id, q.id, JSON.stringify({ pilot: true, ...d })]); };
   try {
@@ -225,6 +226,19 @@ async function runPilotDraft(student: any, q: IQuestion, answer: string): Promis
     let best = 0; let bp = -1;
     for (let i = 0; i < asc.length; i++) { const p = Number(r.probabilities[String(i)] ?? 0); if (p > bp) { bp = p; best = i; } }
     await save({ state: 'done', marks: asc[best].marks, levelIndex: best, guideText: asc[best].descriptor, confidence: r.confidence, model: r.model, checklist: [], scoreOnly: true, at: new Date().toISOString() });
+    // Supporting checks: up to PILOT_CHECKS yes/no questions built from THIS paper's own answer key, each as its OWN request inside the same 6-request / $0.01 grant.
+    const kp = keyPointsFromKey(q.answer || ''); const ids = Object.keys(kp.checks).slice(0, PILOT_CHECKS); const done: Record<string, number> = {}; const lab: Record<string, string> = {};
+    for (const id of ids) {
+      const rs = await getDb().query('UPDATE vedai_students SET pilot_calls = pilot_calls + 1, pilot_cost_usd = pilot_cost_usd + $2 WHERE id=$1 AND pilot_calls < $3 AND pilot_cost_usd + $2 <= $4 RETURNING pilot_calls', [student.id, PILOT_RESERVE_USD, PILOT_MAX_CALLS, PILOT_MAX_USD]);
+      if (!(rs.rowCount ?? 0)) break;
+      if (!(await takeDailySlot())) break;
+      try {
+        const c = await jevNoulOne({ exam_question: q.text, student_answer: answer }, kp.checks[id]);
+        if (typeof c.usageInputTokens === 'number') await getDb().query('UPDATE vedai_students SET pilot_cost_usd = GREATEST(0, pilot_cost_usd - $2 + $3) WHERE id=$1', [student.id, PILOT_RESERVE_USD, estCostUsd(c.usageInputTokens)]);
+        done[id] = c.p; lab[id] = kp.labels[id];
+      } catch { /* keep the full reservation; skip this check */ }
+    }
+    if (Object.keys(lab).length) await save({ state: 'done', marks: asc[best].marks, levelIndex: best, guideText: asc[best].descriptor, confidence: r.confidence, model: r.model, checklist: checklistFrom(lab, done), scoreOnly: false, at: new Date().toISOString() });
   } catch { try { await save({ state: 'failed', note: 'Draft could not be made. Mark by hand.', at: new Date().toISOString() }); } catch { /* ignore */ } }
 }
 async function runDraft(submissionStudentRowId: string, assignmentId: string, ownerId: string, q: IQuestion, answer: string): Promise<void> {
