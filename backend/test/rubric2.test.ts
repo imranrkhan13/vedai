@@ -1,0 +1,12 @@
+import assert from 'assert';
+import { parseResponse } from '../src/services/aiGenerator';
+const a: any = { subject: 'Science', numberOfQuestions: 1, totalMarks: 2, questionTypes: ['Short Questions'], fileContent: 'Rain forms when water vapour condenses around dust in the air.' };
+const mk = (marks: number, rub: any) => JSON.stringify({ title: 'T', sections: [{ name: 'A', instructions: 'x', questions: [{ text: 'Describe how rain forms.', difficulty: 'easy', marks, type: 'Short Questions', concept: 'rain formation', answer: 'Vapour condenses around dust.', rubric: rub }] }] });
+const lv = (m: number[]) => m.map((x, i) => ({ marks: x, descriptor: 'level ' + i, example: 'sample ' + i }));
+let o: any = parseResponse(mk(2, lv([2, 1, 0])), a);
+assert.strictEqual(o.sections[0].questions[0].rubric?.length, 3, '2-mark question keeps a 3-level guide');
+a.totalMarks = 1;  o = parseResponse(mk(1, lv([1, 0, 0])), a);
+assert.ok(!o.sections[0].questions[0].rubric, '1-mark question gets no guide');
+a.totalMarks = 2;  o = parseResponse(mk(2, lv([2, 2, 0])), a);
+assert.ok(!o.sections[0].questions[0].rubric, 'non-decreasing levels rejected');
+console.log('rubric 2-mark tests passed');
