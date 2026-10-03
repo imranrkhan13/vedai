@@ -60,14 +60,19 @@ export async function jevScore(state: Record<string, string>, instructions: stri
 // Server-fixed key points for the SYNTHETIC photosynthesis demo question. One yes/no (Noul) question each, asked in the same single request.
 // The answer is only ever one of the fixed synthetic answers; these points are never built from user-typed text.
 export const DEMO_KEY_POINTS: Record<string, string> = {
-  k1: 'Does `student_answer` say that chlorophyll (in the chloroplasts of the leaf) absorbs sunlight?',
-  k2: 'Does `student_answer` say that carbon dioxide enters the plant (for example through the stomata) and is used?',
-  k3: 'Does `student_answer` say that the plant takes in water (for example from the roots)?',
-  k4: 'Does `student_answer` say that the plant makes glucose and releases oxygen?',
-  k5: 'Does `student_answer` say that extra glucose is stored as starch, or that without sunlight the process slows or stops?',
+  k1: 'Does `student_answer` say that chlorophyll absorbs sunlight?',
+  k2: 'Does `student_answer` say that the plant uses carbon dioxide?',
+  k3: 'Does `student_answer` say that the plant uses water?',
+  k4: 'Does `student_answer` say that carbon dioxide enters through the stomata?',
+  k5: 'Does `student_answer` say that water comes up from the roots?',
+  k6: 'Does `student_answer` say that the plant makes glucose?',
+  k7: 'Does `student_answer` say that the plant releases oxygen?',
+  k8: 'Does `student_answer` say that extra glucose is stored as starch?',
+  k9: 'Does `student_answer` say that without sunlight the process slows or stops?',
 };
 export const DEMO_KEY_LABELS: Record<string, string> = {
-  k1: 'Chlorophyll absorbs sunlight', k2: 'Carbon dioxide enters and is used', k3: 'Water is taken in', k4: 'Makes glucose and releases oxygen', k5: 'Stores glucose as starch / needs sunlight',
+  k1: 'Chlorophyll absorbs sunlight', k2: 'Uses carbon dioxide', k3: 'Uses water', k4: 'Carbon dioxide enters through the stomata', k5: 'Water comes up from the roots',
+  k6: 'Makes glucose', k7: 'Releases oxygen', k8: 'Extra glucose stored as starch', k9: 'Slows or stops without sunlight',
 };
 export function checklist(nouls: Record<string, number> | undefined) {
   return Object.keys(DEMO_KEY_POINTS).map((k) => {
