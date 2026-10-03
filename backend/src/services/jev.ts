@@ -7,6 +7,7 @@ export interface JevScoreResult {
   confidence: number;
   probabilities: Record<string, number>;
   model: string;
+  nouls?: Record<string, number>;
 }
 
 export function jevEnabled(): boolean {
@@ -33,22 +34,44 @@ export async function takeDailySlot(): Promise<boolean> {
   return true;
 }
 
-export async function jevScore(state: Record<string, string>, instructions: string, criteria: string[]): Promise<JevScoreResult> {
+export async function jevScore(state: Record<string, string>, instructions: string, criteria: string[], checks?: Record<string, string>): Promise<JevScoreResult> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 25000);
   try {
     const resp = await fetch('https://api.typesafe.ai/v1/systemone', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.JEV_API_KEY}` },
-      body: JSON.stringify({ state, model: 'jev-1.13.0', questions: { q: { type: 'score', instructions, criteria } } }),
+      body: JSON.stringify({ state, model: 'jev-1.13.0', questions: { q: { type: 'score', instructions, criteria }, ...Object.fromEntries(Object.entries(checks || {}).map(([k, v]) => [k, { type: 'noul', instructions: v }])) } }),
       signal: ctl.signal,
     });
     if (!resp.ok) throw new Error(`jev ${resp.status}`);
     const j: any = await resp.json();
     const a = j?.answers?.q;
     if (!a || a.type !== 'score' || typeof a.score !== 'number' || !a.probabilities) throw new Error('jev bad shape');
-    return { score: a.score, confidence: Number(a.confidence), probabilities: a.probabilities, model: String(j.model || 'jev-1.13.0') };
+    const nouls: Record<string, number> = {};
+    for (const k of Object.keys(checks || {})) { const x = j?.answers?.[k]; if (x && x.type === 'noul' && typeof x.noul === 'number') nouls[k] = x.noul; }
+    return { score: a.score, confidence: Number(a.confidence), probabilities: a.probabilities, model: String(j.model || 'jev-1.13.0'), nouls };
   } finally {
     clearTimeout(t);
   }
+}
+
+
+// Server-fixed key points for the SYNTHETIC photosynthesis demo question. One yes/no (Noul) question each, asked in the same single request.
+// The answer is only ever one of the fixed synthetic answers; these points are never built from user-typed text.
+export const DEMO_KEY_POINTS: Record<string, string> = {
+  k1: 'Does `student_answer` say that chlorophyll (in the chloroplasts of the leaf) absorbs sunlight?',
+  k2: 'Does `student_answer` say that carbon dioxide enters the plant (for example through the stomata) and is used?',
+  k3: 'Does `student_answer` say that the plant takes in water (for example from the roots)?',
+  k4: 'Does `student_answer` say that the plant makes glucose and releases oxygen?',
+  k5: 'Does `student_answer` say that extra glucose is stored as starch, or that without sunlight the process slows or stops?',
+};
+export const DEMO_KEY_LABELS: Record<string, string> = {
+  k1: 'Chlorophyll absorbs sunlight', k2: 'Carbon dioxide enters and is used', k3: 'Water is taken in', k4: 'Makes glucose and releases oxygen', k5: 'Stores glucose as starch / needs sunlight',
+};
+export function checklist(nouls: Record<string, number> | undefined) {
+  return Object.keys(DEMO_KEY_POINTS).map((k) => {
+    const p = nouls && typeof nouls[k] === 'number' ? nouls[k] : null;
+    return { point: DEMO_KEY_LABELS[k], p, status: p === null ? 'unknown' : p >= 0.7 ? 'covered' : p <= 0.3 ? 'not covered' : 'uncertain' };
+  });
 }
