@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { getDb } from '../services/db';
 import { Assignment, IQuestion } from '../models/Assignment';
 import { requireAuth, signToken, verifyToken } from '../services/auth';
-import { jevEnabled, JEV_FIXTURES, JEV_MAX_PER_PAPER, takeDailySlot, jevScore } from '../services/jev';
+import { jevEnabled, JEV_FIXTURES, JEV_MAX_PER_PAPER, takeDailySlot, jevScore, DEMO_KEY_POINTS, checklist } from '../services/jev';
 import { getRedis } from '../services/redis';
 
 // Student portal: the teacher adds students to one assignment and gives each a teacher-chosen student ID.
@@ -197,11 +197,11 @@ async function runDraft(submissionStudentRowId: string, assignmentId: string, ow
     const asc = [...(q.rubric || [])].sort((x, y) => x.marks - y.marks).map((l) => ({ marks: Math.min(l.marks, q.marks), descriptor: l.descriptor }));
     let r;
     try {
-      r = await jevScore({ exam_question: q.text, student_answer: answer }, 'How well does `student_answer` answer `exam_question`? Judge it only against the levels.', asc.map((l) => l.descriptor));
+      r = await jevScore({ exam_question: q.text, student_answer: answer }, 'How well does `student_answer` answer `exam_question`? Judge it only against the levels.', asc.map((l) => l.descriptor), DEMO_KEY_POINTS);
     } catch { return await save({ state: 'failed', note: 'The grading service did not return a usable answer. Mark by hand.', at: new Date().toISOString() }); }
     let best = 0; let bp = -1;
     for (let i = 0; i < asc.length; i++) { const p = Number(r.probabilities[String(i)] ?? 0); if (p > bp) { bp = p; best = i; } }
-    await save({ state: 'done', marks: asc[best].marks, levelIndex: best, guideText: asc[best].descriptor, confidence: r.confidence, model: r.model, at: new Date().toISOString() });
+    await save({ state: 'done', marks: asc[best].marks, levelIndex: best, guideText: asc[best].descriptor, confidence: r.confidence, model: r.model, checklist: checklist(r.nouls), at: new Date().toISOString() });
     await getRedis().del(`assignment:${assignmentId}`);
   } catch { try { await save({ state: 'failed', note: 'Draft could not be made. Mark by hand.', at: new Date().toISOString() }); } catch { /* ignore */ } }
 }
