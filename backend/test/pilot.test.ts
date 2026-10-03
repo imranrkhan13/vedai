@@ -11,14 +11,14 @@ const stub = (f: string, exports: any) => { require.cache[require.resolve(src(f)
 let day = 0;
 stub('services/redis.ts', { getRedis: () => ({ get: async () => null, setex: async () => 'OK', del: async () => 1, incr: async () => ++day, decr: async () => --day, expire: async () => 1 }) });
 stub('services/queue.ts', { getAssignmentQueue: () => ({ add: async () => ({ id: '1' }) }) });
-const bodies: any[] = []; const realFetch = globalThis.fetch;
+let usageMode: 'ok' | 'none' | 'huge' = 'ok'; const bodies: any[] = []; const realFetch = globalThis.fetch;
 (globalThis as any).fetch = async (url: string, init: any) => {
   if (String(url).startsWith('http://127.0.0.1')) return realFetch(url, init);
   if (String(url) === 'https://api.typesafe.ai/v1/systemone') {
     const body = JSON.parse(init.body); bodies.push(body);
     const ans: any = { q: { type: 'score', score: 1, confidence: 0.9, probabilities: { '0': 0.05, '1': 0.9, '2': 0.05 } } };
     Object.keys(body.questions).filter((k) => k !== 'q').forEach((k, i) => { ans[k] = { type: 'noul', noul: i === 0 ? 0.95 : 0.1 }; });
-    return new Response(JSON.stringify({ model: 'jev-1.13.0', answers: ans }), { status: 200 });
+    return new Response(JSON.stringify({ model: 'jev-1.13.0', answers: ans, ...(usageMode === 'none' ? {} : { usage: { input_tokens: usageMode === 'huge' ? 100000 : 1200, output_tokens: 20 } }) }), { status: 200 });
   }
   throw new Error('unexpected outbound fetch ' + url);
 };
@@ -61,7 +61,7 @@ const bodies: any[] = []; const realFetch = globalThis.fetch;
   const d = x.g.draft.q1; ok(d.state === 'done' && d.pilot === true && d.marks === 2 && d.checklist.length === 3 && d.checklist[0].point.startsWith('Rain forms') && d.checklist[0].status === 'covered' && d.checklist[1].status === 'not covered', 'draft stored with the paper\'s own key-point labels');
   ok(Object.keys(x.g.marks).length === 0 && x.g.released === false, 'draft is not marks and is not released');
   const me: any = await fetch(base + '/student/me', { headers: { Cookie: x.ck, 'X-Requested-With': 'quillix' } }).then((r) => r.json()); ok(!JSON.stringify(me).includes('TOP-LEVEL') && !JSON.stringify(me).includes('confidence') && me.data.student.aiPilot === true, 'student never sees draft or guide; pilot flag shown to the student');
-  const cnt: any = (await pg.query("SELECT pilot_calls, pilot_cost_usd FROM vedai_students WHERE id=$1", [x.row])).rows[0]; ok(cnt.pilot_calls === 1 && cnt.pilot_cost_usd >= (Buffer.byteLength(JSON.stringify(bodies[0]), 'utf8') + 2000) * 4 * 0.042 / 1e6 && cnt.pilot_cost_usd < 0.002, 'call count and conservative cost recorded');
+  const cnt: any = (await pg.query("SELECT pilot_calls, pilot_cost_usd FROM vedai_students WHERE id=$1", [x.row])).rows[0]; ok(cnt.pilot_calls === 1 && Math.abs(cnt.pilot_cost_usd - 1200 * 0.042 / 1e6) < 1e-9, 'reservation replaced by the real usage.input_tokens (1200 tokens)');
   // call cap: 8 questions, only 6 requests ever
   const before = bodies.length; const P8 = await mkPaper(8);
   x = await go(P8, 'S6', 'adult', true, true, ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8']);
@@ -76,7 +76,17 @@ const bodies: any[] = []; const realFetch = globalThis.fetch;
   const g7: any = (await t('GET', `/roster/${P2}/${row7}`)).body.data; ok(bodies.length === b2 && g7.draft.q1.state === 'failed', 'spend ceiling reached: no request is made');
   // too short answer / paper without a usable key
   const b3 = bodies.length; x = await go(P1, 'S8', 'adult', true, true, ['q1'], 'short'); ok(bodies.length === b3, 'too-short answer is not sent');
-  { const { estInputTokens, estCostUsd } = await import('../src/services/jev'); const big = { state: { a: 'é'.repeat(2000), b: 'q'.repeat(300) }, questions: { q: {}, k1: {}, k2: {}, k3: {}, k4: {}, k5: {}, k6: {} } }; const c = estCostUsd(estInputTokens(big)); ok(estInputTokens(big) >= 7 * (4300 + 2000) && c < 0.002, 'worst-case bound counts UTF-8 bytes x every question + hidden overhead (a maximal 2000-character answer is bounded under $0.002 per request, so a 6th request may be refused by the ceiling)'); }
+  // missing usage keeps the full documented reservation; usage above the reservation is recorded and blocks the next request
+  { const { PILOT_RESERVE_USD } = await import('../src/services/jev'); ok(Math.abs(PILOT_RESERVE_USD - 0.002688) < 1e-9, 'reservation is the documented 64k tokens at $0.042 per million');
+    usageMode = 'none'; const bN = bodies.length; const xN = await go(P1, 'S9', 'adult', true, true, ['q1']); const cN: any = (await pg.query('SELECT pilot_cost_usd FROM vedai_students WHERE id=$1', [xN.row])).rows[0];
+    ok(bodies.length === bN + 1 && Math.abs(cN.pilot_cost_usd - PILOT_RESERVE_USD) < 1e-9, 'missing usage in the response: full reservation stays counted');
+    usageMode = 'huge'; const P3 = await mkPaper(3); const bH = bodies.length; const xH = await go(P3, 'S10', 'adult', true, true, ['q1', 'q2', 'q3']); const cH: any = (await pg.query('SELECT pilot_cost_usd, pilot_calls FROM vedai_students WHERE id=$1', [xH.row])).rows[0];
+    ok(bodies.length - bH === 2 && cH.pilot_cost_usd > 0.0083 && cH.pilot_calls === 2, 'usage above the reservation is recorded as real cost, and the 3rd request is refused (real 0.0084 + reserve > 0.01)'); 
+    const P4 = await mkPaper(1); const rr = await t('POST', `/roster/${P4}`, { studentId: 'S11', ageGroup: 'adult' }); await pg.query('UPDATE vedai_students SET pilot_cost_usd=0.0075 WHERE id=$1', [rr.body.data.id]); usageMode = 'ok';
+    const l2 = await fetch(base + '/student/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'quillix' }, body: JSON.stringify({ studentId: 'S11', accessCode: rr.body.data.accessCode }) }); const ck2 = (l2.headers.get('set-cookie') || '').split(';')[0]; const H2 = { 'Content-Type': 'application/json', 'X-Requested-With': 'quillix', Cookie: ck2 };
+    await fetch(base + '/student/consent', { method: 'POST', headers: H2, body: JSON.stringify({ agree: true }) }); process.env.REAL_ANSWER_AI_STUDENT = rr.body.data.id; const bQ = bodies.length;
+    await fetch(base + '/student/submit', { method: 'POST', headers: H2, body: JSON.stringify({ answers: { q1: ANS } }) }); await new Promise((z) => setTimeout(z, 300));
+    ok(bodies.length === bQ, 'remaining budget below one documented maximum request: no request is started'); }
   ok(bodies.every((b) => b.model === 'jev-1.13.0'), 'only the Jev endpoint was called');
   console.log(`pilot tests passed: ${n}`); srv.close(); process.exit(0);
 })().catch((e) => { console.error(e); process.exit(1); });
