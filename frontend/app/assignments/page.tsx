@@ -107,7 +107,7 @@ export default function AssignmentsPage() {
               </div>
               <h2 style={{ fontSize:16, fontWeight:600, marginBottom:8, color:'var(--black)' }}>No assignments yet</h2>
               <p style={{ color:'var(--gray-400)', fontSize:13, maxWidth:340, margin:'0 auto 24px', lineHeight:1.6 }}>
-                Create your first assignment to start collecting and grading student submissions.
+                Create your first assignment to generate a question paper and marking guide. Student submissions are not supported yet.
               </p>
               <Link href="/create"><button className="btn btn-primary">+ Create Your First Assignment</button></Link>
             </div>
