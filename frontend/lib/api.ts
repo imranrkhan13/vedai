@@ -52,7 +52,9 @@ export const api = {
   saveGrade: (id: string, questionId: string, marks: number, reason: string) =>
     fetchAPI(`/assignments/${id}/grade`, { method: 'PATCH', body: JSON.stringify({ questionId, marks, reason }) }),
   rosterList: (aid: string) => fetchAPI<{ totalMarks: number; students: { id: string; studentId: string; name: string; submitted: boolean; submittedAt: string | null; late: boolean; released: boolean; markedTotal: number | null }[] }>(`/roster/${aid}`),
-  rosterAdd: (aid: string, studentId: string, name: string) => fetchAPI<{ id: string; studentId: string; accessCode: string }>(`/roster/${aid}`, { method: 'POST', body: JSON.stringify({ studentId, name: name || undefined }) }),
+  rosterAdd: (aid: string, studentId: string, name: string, ageGroup = 'unknown') => fetchAPI<{ id: string; studentId: string; accessCode: string }>(`/roster/${aid}`, { method: 'POST', body: JSON.stringify({ studentId, name: name || undefined, ageGroup }) }),
+  rosterAge: (aid: string, sid: string, ageGroup: string) => fetchAPI<{ ageGroup: string }>(`/roster/${aid}/${sid}/age-group`, { method: 'PATCH', body: JSON.stringify({ ageGroup }) }),
+  studentConsent: (agree: boolean) => fetchAPI<{ aiConsent: boolean }>('/student/consent', { method: 'POST', body: JSON.stringify({ agree }) }),
   rosterReset: (aid: string, sid: string) => fetchAPI<{ accessCode: string }>(`/roster/${aid}/${sid}/reset`, { method: 'POST', body: '{}' }),
   rosterRemove: (aid: string, sid: string) => fetchAPI(`/roster/${aid}/${sid}`, { method: 'DELETE' }),
   rosterSubmission: (aid: string, sid: string) => fetchAPI<any>(`/roster/${aid}/${sid}`),
