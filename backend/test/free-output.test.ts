@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { openRouterRequest, resolveOpenRouterModels } from '../src/services/aiGenerator';
+const r = openRouterRequest('google/gemma-4-31b-it:free', 'SYNTHETIC syllabus only');
+assert.equal(r.model, 'google/gemma-4-31b-it:free');
+assert.deepEqual(r.reasoning, { enabled: false });
+assert.deepEqual(r.provider.max_price, { prompt: 0, completion: 0 });
+assert.equal(r.max_tokens, 8192);
+assert.throws(() => openRouterRequest('paid/model', 'test'), /Paid model blocked/);
+assert.equal(resolveOpenRouterModels({ OPENROUTER_MODEL: 'google/gemma-4-31b-it:free,nvidia/nemotron-3-super-120b-a12b:free,qwen/qwen3.8-27b:free' }).length, 3);
+console.log('free output guard: 6 assertions passed');
