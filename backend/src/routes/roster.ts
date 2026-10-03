@@ -146,7 +146,9 @@ teacherRoster.get('/:aid/:sid', async (req: Request, res: Response) => {
     const { rows } = await getDb().query('SELECT * FROM vedai_submissions WHERE student_row_id=$1', [o.s.id]);
     const b = rows[0];
     const questions = flatQuestions(o.a).map((q, i) => ({ id: q.id, number: i + 1, text: q.text, marks: q.marks, type: q.type, options: q.options || [], answerKey: q.answer || '', rubric: q.rubric || [] }));
-    return res.json({ success: true, data: { student: { id: o.s.id, studentId: o.s.student_code, name: o.s.name || '', ageGroup: o.s.age_group, aiConsent: !!o.s.ai_consent, aiGate: realAnswerAiGate(o.s).why }, questions, submitted: !!b, submittedAt: b?.submitted_at || null, late: !!b?.late, answers: b?.answers || {}, marks: b?.marks || {}, released: !!b?.released, draft: draftView(b?.draft) } });
+    const preview: Record<string, any> = {};
+    for (const q of flatQuestions(o.a)) { const f = feedbackFor(o.s.age_group, q.marks, (b?.marks || {})[q.id]); if (f) preview[q.id] = f; }
+    return res.json({ success: true, data: { student: { id: o.s.id, studentId: o.s.student_code, name: o.s.name || '', ageGroup: o.s.age_group, aiConsent: !!o.s.ai_consent, aiGate: realAnswerAiGate(o.s).why }, questions, submitted: !!b, submittedAt: b?.submitted_at || null, late: !!b?.late, answers: b?.answers || {}, marks: b?.marks || {}, released: !!b?.released, draft: draftView(b?.draft), preview } });
   } catch { return res.status(500).json({ success: false, error: 'Failed to load' }); }
 });
 
