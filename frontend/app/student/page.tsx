@@ -72,7 +72,7 @@ export default function StudentPage() {
           <div className="card" style={{ padding: '12px 20px', marginBottom: 10 }}>
             <label style={{ display: 'flex', gap: 8, fontSize: 12, alignItems: 'flex-start', cursor: 'pointer' }}>
               <input type="checkbox" checked={!!me.student.aiConsent} onChange={async e => { try { await api.studentConsent(e.target.checked); await load(); } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Could not save'); } }} />
-              <span>I agree that my typed answers may be sent to an outside AI service (Typesafe) to draft a grade for my teacher. This only records your choice. Right now no typed answers are sent, and your teacher still decides your marks. You can change this any time.</span>
+              <span>I agree that my typed answers may be sent to an outside AI service (Typesafe) to draft a grade for my teacher. {me.student.aiPilot ? 'You are the one test student: when you submit, each typed answer (up to 6 requests in total) is sent to Typesafe to draft a grade for your teacher only. Typesafe may keep technical logs and usage data for abuse checks and legal reasons (https://typesafe.ai/legal/mca). Your teacher still decides your marks. Untick before you submit if you do not want this.' : 'This only records your choice. Right now no typed answers are sent, and your teacher still decides your marks. You can change this any time.'}</span>
             </label>
           </div>
         )}
