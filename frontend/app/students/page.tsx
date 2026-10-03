@@ -53,7 +53,7 @@ export default function StudentsPage() {
   const saveMark = async (q: any) => {
     const v = mk[q.id]; const n = Number(v.marks);
     if (v.marks === '' || !Number.isInteger(n) || n < 0 || n > q.marks) { toast.error(`Marks must be a whole number from 0 to ${q.marks}`); return; }
-    try { await api.rosterMark(aid, open, q.id, n, v.reason); toast.success('Marks saved'); await load(aid); } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Failed'); }
+    try { await api.rosterMark(aid, open, q.id, n, v.reason); toast.success('Marks saved'); const d = await api.rosterSubmission(aid, open); setDetail(d); await load(aid); } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Failed'); }
   };
   const release = async (released: boolean) => {
     try { await api.rosterRelease(aid, open, released); toast.success(released ? 'Marks shared with the student' : 'Marks hidden from the student'); setDetail({ ...detail, released }); await load(aid); } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Failed'); }
@@ -137,6 +137,7 @@ export default function StudentsPage() {
                         <button className="btn btn-sm" style={{ marginTop: 6 }} onClick={() => setMk({ ...mk, [q.id]: { marks: String(dr.marks), reason: mk[q.id]?.reason || '' } })}>Copy into marks box (you still save)</button>
                       </>}
                     </div>); })()}
+                  {detail.preview?.[q.id] && <p style={{ fontSize: 12, margin: '6px 0', padding: '6px 8px', background: 'var(--gray-50)', borderRadius: 6 }}><b>What the student will see once you share ({detail.student.ageGroup === 'adult' ? '18 or over wording' : detail.student.ageGroup === 'under18' ? 'under 18 wording' : 'age group not set, simple wording'}), from your saved marks:</b> {detail.preview[q.id].text}</p>}
                   {q.answerKey && <p style={{ fontSize: 11, color: 'var(--gray-500)' }}>Answer key (AI draft): {q.answerKey}</p>}
                   {q.rubric.length === 3 && <p style={{ fontSize: 11, color: 'var(--gray-500)' }}>Levels (AI draft): {q.rubric.map((l: any) => `${l.marks}: ${l.descriptor}`).join(' | ')}</p>}
                   <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
