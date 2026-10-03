@@ -46,7 +46,7 @@ export default function StudentPage() {
         <label style={{ fontSize: 12, fontWeight: 600 }}>Access code</label>
         <input className="input" required autoComplete="off" value={code} onChange={e => setCode(e.target.value)} placeholder="XXXXX-XXXXX" style={{ marginTop: 4 }} />
         <button className="btn btn-primary" type="submit" disabled={busy} style={{ width: '100%', marginTop: 18, justifyContent: 'center' }}>{busy ? 'Please wait...' : 'Sign in'}</button>
-        <p style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 14, lineHeight: 1.5 }}>Your answers are saved for your teacher only. They are not sent to any AI service. Marks are given by your teacher.</p>
+        <p style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 14, lineHeight: 1.5 }}>Your answers are saved for your teacher only. They are not sent to any AI service, except the built-in made-up demo answers on the one demo paper. Marks are given by your teacher.</p>
       </form>
     </div>
   );
@@ -91,7 +91,7 @@ export default function StudentPage() {
         {!submitted && (
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 14 }}>
             <button className="btn btn-primary" onClick={submit} disabled={busy}>{busy ? 'Submitting...' : 'Submit answers'}</button>
-            <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>Typed answers only. You can submit once. Your answers go to your teacher, not to an AI service.</span>
+            <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>Typed answers only. You can submit once. Your answers go to your teacher, not to an AI service (except the built-in made-up demo answers on the one demo paper).</span>
           </div>
         )}
       </div>
