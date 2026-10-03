@@ -9,6 +9,7 @@ import { verifyToken } from './services/auth';
 import authRoutes from './routes/auth';
 import assignmentRoutes from './routes/assignments';
 import jobRoutes from './routes/jobs';
+import { teacherRoster, studentPortal } from './routes/roster';
 
 // Load .env ONLY in development — Render injects env vars directly
 if (process.env.NODE_ENV !== 'production') {
@@ -65,6 +66,8 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/jobs', jobRoutes);
+app.use('/api/roster', teacherRoster);
+app.use('/api/student', studentPortal);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), env: process.env.NODE_ENV });
