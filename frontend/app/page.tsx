@@ -36,8 +36,8 @@ const NOT = [
 const FAQ = [
   { q: 'Does the AI mark my students\u2019 work?', a: 'No. Teachers enter every mark by hand. There is a demo of AI scoring that uses made-up sample answers only, and it is not available for real students.' },
   { q: 'Are student answers sent to an AI service?', a: 'No. Typed answers are stored in the app for the teacher to review and are not sent to any AI service.' },
-  { q: 'Can I use it with a real class?', a: 'Not yet for real student data. The app is a working demo and has not been security audited. Use made-up or consented pilot data only until data storage and deletion rules are settled.' },
-  { q: 'What does it cost?', a: 'It is free to use right now and asks for no card.' },
+  { q: 'Can I use it with a real class?', a: 'Not yet. Do not enter real student data. The app is a working demo and has not been security audited. Use made-up demo data only until student-data storage, retention and privacy rules are settled.' },
+  { q: 'What does it cost?', a: 'It is free to try right now and asks for no card. It runs on free AI models with limits: up to 10 paper requests per hour, and generation can be slow or pause when the free daily allowance runs out. Free access is not guaranteed to last.' },
   { q: 'How do students sign in?', a: 'Students open the student page and enter the ID and access code you gave them. Teachers pass codes on themselves, and a lost code can be replaced.' },
 ];
 
@@ -110,7 +110,7 @@ export default function Landing() {
 
       <section className="lp-hero">
         <div className="lp-wrap">
-          <span className="lp-pill">Working demo - free to try, no card</span>
+          <span className="lp-pill">Working demo - free to try, with limits, no card</span>
           <h1 className="lp-h1">Question papers and marking guides, drafted from your own notes</h1>
           <p className="lp-sub">Ques-AI helps teachers draft a paper, an answer key and a marking guide in minutes. You check and edit everything. Students submit typed answers and you mark them yourself.</p>
           <div className="lp-cta">
@@ -191,7 +191,7 @@ export default function Landing() {
       </section>
 
       <footer className="lp-wrap lp-foot">
-        <p>Ques-AI is a demo and has not been security audited. AI drafts can contain mistakes: teachers must check papers and marks. Use made-up or consented pilot data only.</p>
+        <p>Ques-AI is a demo and has not been security audited. AI drafts can contain mistakes: teachers must check papers and marks. Use made-up demo data only until student-data rules are settled.</p>
       </footer>
     </div>
   );
