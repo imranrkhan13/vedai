@@ -15,7 +15,7 @@ const FEATURES = [
   { icon: FileText, title: 'Two separate PDFs', text: 'The student PDF has no answers. The teacher guide has the answers, source sentences and marking levels.' },
   { icon: Users, title: 'Student IDs you control', text: 'You choose each student ID. The ID alone does not let anyone in: every student also gets a random access code from you.' },
   { icon: ScanText, title: 'Printed text upload', text: 'Upload a page of printed English text. Handwriting has not been tested and is not supported.' },
-  { icon: ShieldCheck, title: 'Private to your account', text: 'Each teacher only sees their own papers and students. Student answers are not sent to any AI service.' },
+  { icon: ShieldCheck, title: 'Private to your account', text: 'Each teacher only sees their own papers and students. Student answers are not sent to any AI service, except built-in made-up answers on one demo paper.' },
 ];
 
 const WORKS = [
@@ -35,7 +35,7 @@ const NOT = [
 ];
 const FAQ = [
   { q: 'Does the AI mark my students\u2019 work?', a: 'No. Teachers enter every mark by hand. There is a demo of AI scoring that uses made-up sample answers only, and it is not available for real students.' },
-  { q: 'Are student answers sent to an AI service?', a: 'No. Typed answers are stored in the app for the teacher to review and are not sent to any AI service.' },
+  { q: 'Are student answers sent to an AI service?', a: 'No. Typed answers are stored in the app for the teacher to review and are not sent to any AI service, except built-in made-up answers on one demo paper.' },
   { q: 'Can I use it with a real class?', a: 'Not yet. Do not enter real student data. The app is a working demo and has not been security audited. Use made-up demo data only until student-data storage, retention and privacy rules are settled.' },
   { q: 'What does it cost?', a: 'It is free to try right now and asks for no card. It runs on free AI models with limits: up to 10 paper requests per hour, and generation can be slow or pause when the free daily allowance runs out. Free access is not guaranteed to last.' },
   { q: 'How do students sign in?', a: 'Students open the student page and enter the ID and access code you gave them. Teachers pass codes on themselves, and a lost code can be replaced.' },
