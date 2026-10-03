@@ -31,7 +31,7 @@ let outbound = 0; const realFetch = globalThis.fetch;
   ok(!realAnswerAiGate({ age_group: 'unknown', ai_consent: true }).allowed, 'unknown never allowed');
   ok(!realAnswerAiGate({ age_group: 'adult', ai_consent: false }).allowed, 'adult without consent not allowed');
   ok(!realAnswerAiGate({ age_group: 'adult', ai_consent: true }).allowed, 'adult with consent still blocked while switch is off');
-  process.env.REAL_ANSWER_AI = 'on'; ok(realAnswerAiGate({ age_group: 'adult', ai_consent: true }).allowed && !realAnswerAiGate({ age_group: 'under18', ai_consent: true }).allowed, 'switch on: only consenting adult passes'); delete process.env.REAL_ANSWER_AI;
+  process.env.REAL_ANSWER_AI_STUDENT = 'row-1'; ok(realAnswerAiGate({ id: 'row-1', age_group: 'adult', ai_consent: true }).allowed && !realAnswerAiGate({ id: 'row-2', age_group: 'adult', ai_consent: true }).allowed && !realAnswerAiGate({ id: 'row-1', age_group: 'under18', ai_consent: true }).allowed, 'only the one named pilot student can pass'); delete process.env.REAL_ANSWER_AI_STUDENT;
   // wording: same marks, different words
   const m = { marks: 7, reason: 'Good start' };
   const fa = feedbackFor('adult', 10, m)!, fy = feedbackFor('under18', 10, m)!, fu = feedbackFor('unknown', 10, m)!;
