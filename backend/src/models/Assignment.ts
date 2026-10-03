@@ -198,6 +198,12 @@ export const Assignment = {
   async deleteById(id: string, ownerId: string): Promise<boolean> {
     if (!UUID_RE.test(id)) return false;
     const r = await getDb().query('DELETE FROM vedai_assignments WHERE id=$1 AND owner_id=$2', [id, ownerId]);
-    return (r.rowCount ?? 0) > 0;
+    const removed = (r.rowCount ?? 0) > 0;
+    // Only after the owner-checked delete succeeded: remove that paper's students and submissions too (ends their sessions).
+    if (removed) {
+      await getDb().query('DELETE FROM vedai_submissions WHERE assignment_id=$1 AND owner_id=$2', [id, ownerId]);
+      await getDb().query('DELETE FROM vedai_students WHERE assignment_id=$1 AND owner_id=$2', [id, ownerId]);
+    }
+    return removed;
   },
 };
