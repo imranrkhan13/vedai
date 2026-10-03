@@ -46,6 +46,29 @@ CREATE TABLE IF NOT EXISTS vedai_users (
   password_hash TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS vedai_students (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  assignment_id TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  student_code TEXT NOT NULL,
+  name TEXT,
+  access_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS vedai_students_access_hash_idx ON vedai_students (access_hash);
+CREATE UNIQUE INDEX IF NOT EXISTS vedai_students_code_idx ON vedai_students (assignment_id, lower(student_code));
+CREATE TABLE IF NOT EXISTS vedai_submissions (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  student_row_id TEXT NOT NULL UNIQUE,
+  assignment_id TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  answers JSONB NOT NULL,
+  late BOOLEAN NOT NULL DEFAULT false,
+  marks JSONB NOT NULL DEFAULT '{}'::jsonb,
+  released BOOLEAN NOT NULL DEFAULT false,
+  submitted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 CREATE INDEX IF NOT EXISTS vedai_assignments_created_at_idx ON vedai_assignments (created_at DESC);
 `;
 
