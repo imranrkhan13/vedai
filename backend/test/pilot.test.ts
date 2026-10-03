@@ -61,7 +61,7 @@ const bodies: any[] = []; const realFetch = globalThis.fetch;
   const d = x.g.draft.q1; ok(d.state === 'done' && d.pilot === true && d.marks === 2 && d.checklist.length === 3 && d.checklist[0].point.startsWith('Rain forms') && d.checklist[0].status === 'covered' && d.checklist[1].status === 'not covered', 'draft stored with the paper\'s own key-point labels');
   ok(Object.keys(x.g.marks).length === 0 && x.g.released === false, 'draft is not marks and is not released');
   const me: any = await fetch(base + '/student/me', { headers: { Cookie: x.ck, 'X-Requested-With': 'quillix' } }).then((r) => r.json()); ok(!JSON.stringify(me).includes('TOP-LEVEL') && !JSON.stringify(me).includes('confidence') && me.data.student.aiPilot === true, 'student never sees draft or guide; pilot flag shown to the student');
-  const cnt: any = (await pg.query("SELECT pilot_calls, pilot_cost_usd FROM vedai_students WHERE id=$1", [x.row])).rows[0]; ok(cnt.pilot_calls === 1 && cnt.pilot_cost_usd > 0 && cnt.pilot_cost_usd < 0.001, 'call count and conservative cost recorded');
+  const cnt: any = (await pg.query("SELECT pilot_calls, pilot_cost_usd FROM vedai_students WHERE id=$1", [x.row])).rows[0]; ok(cnt.pilot_calls === 1 && cnt.pilot_cost_usd >= (Buffer.byteLength(JSON.stringify(bodies[0]), 'utf8') + 2000) * 4 * 0.042 / 1e6 && cnt.pilot_cost_usd < 0.002, 'call count and conservative cost recorded');
   // call cap: 8 questions, only 6 requests ever
   const before = bodies.length; const P8 = await mkPaper(8);
   x = await go(P8, 'S6', 'adult', true, true, ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8']);
@@ -76,6 +76,7 @@ const bodies: any[] = []; const realFetch = globalThis.fetch;
   const g7: any = (await t('GET', `/roster/${P2}/${row7}`)).body.data; ok(bodies.length === b2 && g7.draft.q1.state === 'failed', 'spend ceiling reached: no request is made');
   // too short answer / paper without a usable key
   const b3 = bodies.length; x = await go(P1, 'S8', 'adult', true, true, ['q1'], 'short'); ok(bodies.length === b3, 'too-short answer is not sent');
+  { const { estInputTokens, estCostUsd } = await import('../src/services/jev'); const big = { state: { a: 'é'.repeat(2000), b: 'q'.repeat(300) }, questions: { q: {}, k1: {}, k2: {}, k3: {}, k4: {}, k5: {}, k6: {} } }; const c = estCostUsd(estInputTokens(big)); ok(estInputTokens(big) >= 7 * (4300 + 2000) && c < 0.002, 'worst-case bound counts UTF-8 bytes x every question + hidden overhead (a maximal 2000-character answer is bounded under $0.002 per request, so a 6th request may be refused by the ceiling)'); }
   ok(bodies.every((b) => b.model === 'jev-1.13.0'), 'only the Jev endpoint was called');
   console.log(`pilot tests passed: ${n}`); srv.close(); process.exit(0);
 })().catch((e) => { console.error(e); process.exit(1); });
