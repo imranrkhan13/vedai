@@ -9,11 +9,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    if (path === '/login') { setReady(true); return; }
+    if (path === '/login' || path === '/student') { setReady(true); return; }
     let live = true;
     api.me().then((u) => { auth.save(u.email); if (live) setReady(true); }).catch(() => { if (live) router.replace('/login'); });
     return () => { live = false; };
   }, [path, router]);
-  if (!ready && path !== '/login') return null;
+  if (!ready && path !== '/login' && path !== '/student') return null;
   return <>{children}</>;
 }
