@@ -75,6 +75,15 @@ export function resolveOpenRouterModels(env: NodeJS.ProcessEnv = process.env): s
   return list;
 }
 
+// Keep optional reasoning from consuming the visible JSON output budget. Free-price routing
+// is a second guard in addition to the mandatory :free model suffix.
+export function openRouterRequest(model: string, prompt: string) {
+  if (!model.endsWith(':free')) throw new Error('Paid model blocked');
+  return { model, messages: [{ role: 'user', content: prompt }], max_tokens: 8192,
+    temperature: 0.4, reasoning: { enabled: false },
+    provider: { max_price: { prompt: 0, completion: 0 } } };
+}
+
 export function redactError(text: string, key?: string): string {
   let t = String(text).slice(0, 300).replace(/\s+/g, ' ');
   if (key) t = t.split(key).join('***');
@@ -90,7 +99,7 @@ async function tryOpenRouter(prompt: string): Promise<string> {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'HTTP-Referer': 'https://vedaai.app', 'X-Title': 'VedaAI' },
-      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 8192, temperature: 0.4 }),
+      body: JSON.stringify(openRouterRequest(model, prompt)),
     });
     if (!res.ok) {
       const body = redactError(await res.text().catch(() => ''), key);
