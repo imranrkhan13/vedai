@@ -114,7 +114,7 @@ export default function StudentsPage() {
                   <p style={{ fontSize: 13, whiteSpace: 'pre-wrap', margin: '6px 0', padding: '8px 10px', background: 'var(--gray-50)', borderRadius: 8 }}>{detail.answers[q.id] || '(no answer)'}</p>
                   {(() => { const dr = detail.draft?.[q.id]; if (!dr) return null; return (
                     <div style={{ margin: '6px 0', padding: '8px 10px', border: '1px dashed var(--gray-300)', borderRadius: 8, fontSize: 12 }} role="status">
-                      <b>AI draft for you only (SYNTHETIC demo, not final marks)</b>
+                      <b>{dr.pilot ? 'AI draft for you only (consented single-student pilot, not final marks)' : 'AI draft for you only (SYNTHETIC demo, not final marks)'}</b>
                       {dr.state === 'pending' && <p style={{ margin: '4px 0 0' }}>Drafting... <button className="btn btn-sm" onClick={() => view({ id: open } as Row)}>Refresh</button></p>}
                       {dr.state === 'failed' && <p style={{ margin: '4px 0 0' }}>No draft: {dr.note || 'Mark by hand.'}</p>}
                       {dr.state === 'done' && <>
