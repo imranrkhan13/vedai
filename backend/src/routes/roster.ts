@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { getDb } from '../services/db';
 import { Assignment, IQuestion } from '../models/Assignment';
 import { requireAuth, signToken, verifyToken } from '../services/auth';
-import { jevEnabled, JEV_FIXTURES, JEV_MAX_PER_PAPER, takeDailySlot, jevScore, DEMO_KEY_POINTS, checklist } from '../services/jev';
+import { jevEnabled, jevKeyReady, JEV_FIXTURES, JEV_MAX_PER_PAPER, takeDailySlot, jevScore, DEMO_KEY_POINTS, checklist, PILOT_MAX_CALLS, PILOT_MAX_USD, estInputTokens, estCostUsd, keyPointsFromKey, checklistFrom } from '../services/jev';
 import { cleanAgeGroup, feedbackFor, realAnswerAiGate } from '../services/feedback';
 import { getRedis } from '../services/redis';
 
@@ -198,6 +198,33 @@ export function draftEligible(a: any, ownerId: string, q: IQuestion, answer: str
   if (!Object.values(JEV_FIXTURES).includes(answer)) return { ok: false, why: 'AI draft only works on the built-in synthetic demo answers. This answer was not sent to any AI service.' };
   return { ok: true };
 }
+// ---- Consented single-student pilot: a REAL typed answer from one named adult student who ticked consent. ----
+export function pilotEligible(student: any, a: any, q: IQuestion, answer: string): { ok: boolean; why?: string } {
+  if (!jevKeyReady()) return { ok: false, why: 'AI draft is switched off' };
+  const g = realAnswerAiGate(student); if (!g.allowed) return { ok: false, why: g.why };
+  if (!q.rubric || q.rubric.length < 2 || !q.answer || Object.keys(keyPointsFromKey(q.answer).checks).length < 2) return { ok: false, why: 'This question has no usable marking guide and answer key for an AI draft.' };
+  if (answer.trim().length < 10 || answer.length > 2000) return { ok: false, why: 'Answer too short or too long for the pilot.' };
+  return { ok: true };
+}
+async function runPilotDraft(student: any, q: IQuestion, answer: string): Promise<void> {
+  const save = async (d: any) => { await getDb().query("UPDATE vedai_submissions SET draft = jsonb_set(draft, ARRAY[$2]::text[], $3::jsonb), updated_at=now() WHERE student_row_id=$1", [student.id, q.id, JSON.stringify({ pilot: true, ...d })]); };
+  try {
+    const asc = [...(q.rubric || [])].sort((x, y) => x.marks - y.marks).map((l) => ({ marks: Math.min(l.marks, q.marks), descriptor: l.descriptor }));
+    const { checks, labels } = keyPointsFromKey(q.answer || '');
+    const instr = 'How well does `student_answer` answer `exam_question`? Judge it only against the levels.';
+    const cost = estCostUsd(estInputTokens({ state: { exam_question: q.text, student_answer: answer }, instr, criteria: asc.map((l) => l.descriptor), checks }));
+    // Hard ceiling, reserved atomically BEFORE the request: at most PILOT_MAX_CALLS requests and PILOT_MAX_USD estimated (over-counted) spend for this student.
+    const rsv = await getDb().query('UPDATE vedai_students SET pilot_calls = pilot_calls + 1, pilot_cost_usd = pilot_cost_usd + $2 WHERE id=$1 AND pilot_calls < $3 AND pilot_cost_usd + $2 <= $4 RETURNING pilot_calls', [student.id, cost, PILOT_MAX_CALLS, PILOT_MAX_USD]);
+    if (!(rsv.rowCount ?? 0)) return await save({ state: 'failed', note: 'Pilot request or spend limit reached. Mark by hand.', at: new Date().toISOString() });
+    if (!(await takeDailySlot())) return await save({ state: 'failed', note: 'Daily limit reached. Mark by hand.', at: new Date().toISOString() });
+    let r;
+    try { r = await jevScore({ exam_question: q.text, student_answer: answer }, instr, asc.map((l) => l.descriptor), checks); }
+    catch { return await save({ state: 'failed', note: 'The grading service did not return a usable answer. Mark by hand.', at: new Date().toISOString() }); }
+    let best = 0; let bp = -1;
+    for (let i = 0; i < asc.length; i++) { const p = Number(r.probabilities[String(i)] ?? 0); if (p > bp) { bp = p; best = i; } }
+    await save({ state: 'done', marks: asc[best].marks, levelIndex: best, guideText: asc[best].descriptor, confidence: r.confidence, model: r.model, checklist: checklistFrom(labels, r.nouls), at: new Date().toISOString() });
+  } catch { try { await save({ state: 'failed', note: 'Draft could not be made. Mark by hand.', at: new Date().toISOString() }); } catch { /* ignore */ } }
+}
 async function runDraft(submissionStudentRowId: string, assignmentId: string, ownerId: string, q: IQuestion, answer: string): Promise<void> {
   const save = async (d: any) => {
     await getDb().query("UPDATE vedai_submissions SET draft = jsonb_set(draft, ARRAY[$2]::text[], $3::jsonb), updated_at=now() WHERE student_row_id=$1", [submissionStudentRowId, q.id, JSON.stringify(d)]);
@@ -298,7 +325,7 @@ studentPortal.get('/me', requireStudent, async (req: Request, res: Response) => 
     const feedback: Record<string, any> = {};
     if (released) for (const q of qs) { const f = feedbackFor(s.age_group, q.marks, (b.marks || {})[q.id]); if (f) feedback[q.id] = f; }
     return res.json({ success: true, data: {
-      student: { studentId: s.student_code, name: s.name || '', ageGroup: s.age_group, aiConsent: !!s.ai_consent },
+      student: { studentId: s.student_code, name: s.name || '', ageGroup: s.age_group, aiConsent: !!s.ai_consent, aiPilot: !!s.id && process.env.REAL_ANSWER_AI_STUDENT === s.id },
       assignment: { title: a.title, subject: a.subject, dueDate: a.dueDate, totalMarks: qs.reduce((n, q) => n + q.marks, 0), questions },
       submission: b ? { submitted: true, submittedAt: b.submitted_at, late: !!b.late, answers: b.answers || {}, released, marks: released ? b.marks || {} : null, total: released ? totalMarks(b.marks) : null, feedback: released ? feedback : null } : { submitted: false },
     } });
@@ -338,6 +365,11 @@ studentPortal.post('/submit', requireStudent, async (req: Request, res: Response
       [s.id, s.assignment_id, s.owner_id, JSON.stringify(answers), late]);
     if (!(r.rowCount ?? 0)) return res.status(409).json({ success: false, error: 'You have already submitted. Ask your teacher if you need to change something.' });
     // automatic AI draft (synthetic demo only). Submission is already saved; the draft runs after and never blocks or changes it.
+    const pil = flatQuestions(a).filter((q) => answers[q.id] !== undefined && pilotEligible(s, a, q, answers[q.id]).ok);
+    for (const q of pil) {
+      await getDb().query("UPDATE vedai_submissions SET draft = jsonb_set(draft, ARRAY[$2]::text[], $3::jsonb) WHERE student_row_id=$1", [s.id, q.id, JSON.stringify({ state: 'pending', pilot: true, at: new Date().toISOString() })]);
+    }
+    if (pil.length) void (async () => { for (const q of pil) await runPilotDraft(s, q, answers[q.id]); })();
     const eligible = flatQuestions(a).filter((q) => answers[q.id] !== undefined && draftEligible(a, s.owner_id, q, answers[q.id]).ok);
     if (eligible.length) {
       const q = eligible[0];
