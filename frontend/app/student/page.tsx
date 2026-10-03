@@ -2,10 +2,12 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 interface SQ { id: string; number: number; text: string; marks: number; type: string; options: string[] }
 
 export default function StudentPage() {
+  const [confirm, confirmNode] = useConfirm();
   const [me, setMe] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [sid, setSid] = useState('');
@@ -26,7 +28,7 @@ export default function StudentPage() {
   };
   const submit = async () => {
     if (busy) return;
-    if (!window.confirm('Submit your answers? You cannot change them after this.')) return;
+    if (!(await confirm('Submit your answers? You cannot change them after this.', 'Submit'))) return;
     setBusy(true);
     try { await api.studentSubmit(ans); toast.success('Submitted'); await load(); }
     catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Could not submit'); }
@@ -56,6 +58,7 @@ export default function StudentPage() {
   const val = (q: SQ) => (submitted ? (sub.answers[q.id] || '') : (ans[q.id] || ''));
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '20px 16px 60px' }}>
+      {confirmNode}
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 17, fontWeight: 700 }}>Ques-AI</span>
