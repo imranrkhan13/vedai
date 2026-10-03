@@ -55,10 +55,10 @@ let usageMode: 'ok' | 'none' | 'huge' = 'ok'; const bodies: any[] = []; const re
   x = await go(P1, 'S3', 'unknown', false, true, ['q1']); ok(bodies.length === 0, 'unknown age: nothing sent');
   x = await go(P1, 'S4', 'adult', false, true, ['q1']); ok(bodies.length === 0, 'adult named but no consent: nothing sent');
   x = await go(P1, 'S5', 'adult', true, true, ['q1']);
-  ok(bodies.length === 1 && bodies[0].state.student_answer === ANS, 'consented named adult: exactly one request with his own answer');
+  ok(bodies.length === 1 && bodies[0].state.student_answer === ANS && JSON.stringify(bodies[0]).indexOf('water vapour') < 0, 'consented named adult: exactly one request with his own answer, no answer key text sent');
   ok(bodies[0].questions.q.criteria.join('|') === 'LOW-LEVEL|MID-LEVEL|TOP-LEVEL', 'criteria come from this paper\'s own rubric, ascending');
-  const keys = Object.keys(bodies[0].questions).filter((k) => k !== 'q'); ok(keys.length === 3 && JSON.stringify(bodies[0].questions).includes('water vapour condenses around dust') && !JSON.stringify(bodies[0].questions).includes('photosynthesis'), 'key-point checks built from this paper\'s own key (3 sentences), not the photosynthesis demo');
-  const d = x.g.draft.q1; ok(d.state === 'done' && d.pilot === true && d.marks === 2 && d.checklist.length === 3 && d.checklist[0].point.startsWith('Rain forms') && d.checklist[0].status === 'covered' && d.checklist[1].status === 'not covered', 'draft stored with the paper\'s own key-point labels');
+  ok(Object.keys(bodies[0].questions).join(',') === 'q' && bodies[0].questions.q.type === 'score', 'score-only: ONE Score question per request, no yes/no checks');
+  const d = x.g.draft.q1; ok(d.state === 'done' && d.pilot === true && d.scoreOnly === true && d.marks === 2 && Array.isArray(d.checklist) && d.checklist.length === 0 && d.guideText === 'MID-LEVEL', 'draft stored: level marks and the teacher\'s own guide text, no supporting checks');
   ok(Object.keys(x.g.marks).length === 0 && x.g.released === false, 'draft is not marks and is not released');
   const me: any = await fetch(base + '/student/me', { headers: { Cookie: x.ck, 'X-Requested-With': 'quillix' } }).then((r) => r.json()); ok(!JSON.stringify(me).includes('TOP-LEVEL') && !JSON.stringify(me).includes('confidence') && me.data.student.aiPilot === true, 'student never sees draft or guide; pilot flag shown to the student');
   const cnt: any = (await pg.query("SELECT pilot_calls, pilot_cost_usd FROM vedai_students WHERE id=$1", [x.row])).rows[0]; ok(cnt.pilot_calls === 1 && Math.abs(cnt.pilot_cost_usd - 1200 * 0.042 / 1e6) < 1e-9, 'reservation replaced by the real usage.input_tokens (1200 tokens)');
