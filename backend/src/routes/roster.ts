@@ -148,7 +148,7 @@ teacherRoster.get('/:aid/:sid', async (req: Request, res: Response) => {
     const questions = flatQuestions(o.a).map((q, i) => ({ id: q.id, number: i + 1, text: q.text, marks: q.marks, type: q.type, options: q.options || [], answerKey: q.answer || '', rubric: q.rubric || [] }));
     const preview: Record<string, any> = {};
     for (const q of flatQuestions(o.a)) { const f = feedbackFor(o.s.age_group, q.marks, (b?.marks || {})[q.id]); if (f) preview[q.id] = f; }
-    return res.json({ success: true, data: { student: { id: o.s.id, studentId: o.s.student_code, name: o.s.name || '', ageGroup: o.s.age_group, aiConsent: !!o.s.ai_consent, aiGate: realAnswerAiGate(o.s).why }, questions, submitted: !!b, submittedAt: b?.submitted_at || null, late: !!b?.late, answers: b?.answers || {}, marks: b?.marks || {}, released: !!b?.released, draft: draftView(b?.draft), preview } });
+    return res.json({ success: true, data: { student: { id: o.s.id, studentId: o.s.student_code, name: o.s.name || '', ageGroup: o.s.age_group, aiConsent: !!o.s.ai_consent, aiGate: realAnswerAiGate(o.s).why, aiRequests: Number(o.s.pilot_calls || 0), aiCostUsd: Number(o.s.pilot_cost_usd || 0) }, questions, submitted: !!b, submittedAt: b?.submitted_at || null, late: !!b?.late, answers: b?.answers || {}, marks: b?.marks || {}, released: !!b?.released, draft: draftView(b?.draft), preview } });
   } catch { return res.status(500).json({ success: false, error: 'Failed to load' }); }
 });
 
