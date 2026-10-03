@@ -20,7 +20,7 @@ const realFetch = globalThis.fetch;
   if (String(url) === 'https://api.typesafe.ai/v1/systemone') {
     jevBodies.push(JSON.parse(init.body));
     if (jevMode === 'fail') return new Response('{}', { status: 500 });
-    return new Response(JSON.stringify({ model: 'jev-1.13.0', answers: { q: { type: 'score', score: 2, confidence: 0.8, probabilities: { '0': 0.05, '1': 0.1, '2': 0.85 } } } }), { status: 200 });
+    const body = JSON.parse(init.body); const ans: any = { q: { type: 'score', score: 2, confidence: 0.8, probabilities: { '0': 0.05, '1': 0.1, '2': 0.85 } } }; const pv: Record<string, number> = { k1: 0.95, k2: 0.5, k3: 0.1 }; for (const k of Object.keys(body.questions)) if (k !== 'q' && k in pv) ans[k] = { type: 'noul', noul: pv[k] }; return new Response(JSON.stringify({ model: 'jev-1.13.0', answers: ans }), { status: 200 });
   }
   throw new Error('unexpected outbound fetch ' + url);
 };
@@ -66,6 +66,8 @@ const realFetch = globalThis.fetch;
   ok(jevBodies.length === 1 && jevBodies[0].state.student_answer === JEV_FIXTURES.full, 'exact synthetic answer sent once');
   ok(jevBodies[0].questions.q.criteria.join('|') === 'LOW-GUIDE|MID-GUIDE|FULL-GUIDE', 'criteria sent in ascending marks order');
   const d = x.g.draft.q1; ok(d.state === 'done' && d.marks === 5 && d.guideText === 'FULL-GUIDE' && d.confidence === 0.8, 'draft stored: level marks, guide text, model-reported confidence');
+  ok(Object.keys(jevBodies[0].questions).join(',') === 'q,k1,k2,k3,k4,k5' && jevBodies.length === 1, 'key-point yes/no questions ride in the same single request');
+  const cl = d.checklist; ok(cl.length === 5 && cl[0].status === 'covered' && cl[1].status === 'uncertain' && cl[2].status === 'not covered' && cl[3].status === 'unknown' && cl[3].p === null, 'checklist: covered / uncertain / not covered / unknown (missing answer kept as unknown)');
   ok(!('reason' in d), 'no fabricated reason field, only the matching guide text');
   ok(Object.keys(x.g.marks).length === 0 && x.g.released === false, 'draft is not marks and is not released');
   ok(!JSON.stringify(x.me).includes('FULL-GUIDE') && !JSON.stringify(x.me).includes('"draft"') && !JSON.stringify(x.me).includes('confidence'), 'student never sees the draft');
