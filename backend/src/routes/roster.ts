@@ -202,7 +202,7 @@ export function draftEligible(a: any, ownerId: string, q: IQuestion, answer: str
 export function pilotEligible(student: any, a: any, q: IQuestion, answer: string): { ok: boolean; why?: string } {
   if (!jevKeyReady()) return { ok: false, why: 'AI draft is switched off' };
   const g = realAnswerAiGate(student); if (!g.allowed) return { ok: false, why: g.why };
-  if (!q.rubric || q.rubric.length < 2 || !q.answer || Object.keys(keyPointsFromKey(q.answer).checks).length < 2) return { ok: false, why: 'This question has no usable marking guide and answer key for an AI draft.' };
+  if (!q.rubric || q.rubric.length < 2) return { ok: false, why: 'This question has no usable marking guide for an AI draft.' };
   if (answer.trim().length < 10 || answer.length > 2000) return { ok: false, why: 'Answer too short or too long for the pilot.' };
   return { ok: true };
 }
@@ -210,7 +210,8 @@ async function runPilotDraft(student: any, q: IQuestion, answer: string): Promis
   const save = async (d: any) => { await getDb().query("UPDATE vedai_submissions SET draft = jsonb_set(draft, ARRAY[$2]::text[], $3::jsonb), updated_at=now() WHERE student_row_id=$1", [student.id, q.id, JSON.stringify({ pilot: true, ...d })]); };
   try {
     const asc = [...(q.rubric || [])].sort((x, y) => x.marks - y.marks).map((l) => ({ marks: Math.min(l.marks, q.marks), descriptor: l.descriptor }));
-    const { checks, labels } = keyPointsFromKey(q.answer || '');
+    // Score-only pilot: ONE Score question per request, no yes/no checks in the same request.
+    const checks = undefined;
     const instr = 'How well does `student_answer` answer `exam_question`? Judge it only against the levels.';
     if (Buffer.byteLength(JSON.stringify(jevBody({ exam_question: q.text, student_answer: answer }, instr, asc.map((l) => l.descriptor), checks)), 'utf8') > 40000) return await save({ state: 'failed', note: 'Too long for the pilot. Mark by hand.', at: new Date().toISOString() });
     // Reserve the documented per-request maximum BEFORE the call (at most PILOT_MAX_CALLS requests and PILOT_MAX_USD in total); reconciled to real usage afterwards.
@@ -223,7 +224,7 @@ async function runPilotDraft(student: any, q: IQuestion, answer: string): Promis
     if (typeof r.usageInputTokens === 'number') await getDb().query('UPDATE vedai_students SET pilot_cost_usd = GREATEST(0, pilot_cost_usd - $2 + $3) WHERE id=$1', [student.id, PILOT_RESERVE_USD, estCostUsd(r.usageInputTokens)]);
     let best = 0; let bp = -1;
     for (let i = 0; i < asc.length; i++) { const p = Number(r.probabilities[String(i)] ?? 0); if (p > bp) { bp = p; best = i; } }
-    await save({ state: 'done', marks: asc[best].marks, levelIndex: best, guideText: asc[best].descriptor, confidence: r.confidence, model: r.model, checklist: checklistFrom(labels, r.nouls), at: new Date().toISOString() });
+    await save({ state: 'done', marks: asc[best].marks, levelIndex: best, guideText: asc[best].descriptor, confidence: r.confidence, model: r.model, checklist: [], scoreOnly: true, at: new Date().toISOString() });
   } catch { try { await save({ state: 'failed', note: 'Draft could not be made. Mark by hand.', at: new Date().toISOString() }); } catch { /* ignore */ } }
 }
 async function runDraft(submissionStudentRowId: string, assignmentId: string, ownerId: string, q: IQuestion, answer: string): Promise<void> {
