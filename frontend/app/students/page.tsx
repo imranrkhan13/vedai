@@ -120,6 +120,7 @@ export default function StudentsPage() {
                       {dr.state === 'done' && <>
                         <p style={{ margin: '4px 0 0' }}>Suggested marks: <b>{dr.marks}/{q.marks}</b>. Model-reported confidence {Math.round(dr.confidence * 100)}% (not an accuracy figure). Model {dr.model}.</p>
                         <p style={{ margin: '4px 0 0' }}>Matching marking-guide level (this is the guide text, not AI reasoning): {dr.guideText}</p>
+                        {dr.scoreOnly && <p style={{ margin: '4px 0 0', color: 'var(--gray-500)' }}>Score-only pilot: one score question, no supporting checks and no AI explanation. The text above is your own marking guide.</p>}
                         {Array.isArray(dr.checklist) && dr.checklist.length > 0 && (() => {
                           const by = (st: string) => dr.checklist.filter((c: any) => c.status === st).map((c: any) => c.point);
                           const cov = by('covered'), unc = [...by('uncertain'), ...by('unknown')], nc = by('not covered');
