@@ -114,6 +114,10 @@ export default function StudentsPage() {
                       {dr.state === 'done' && <>
                         <p style={{ margin: '4px 0 0' }}>Suggested marks: <b>{dr.marks}/{q.marks}</b>. Model-reported confidence {Math.round(dr.confidence * 100)}% (not an accuracy figure). Model {dr.model}.</p>
                         <p style={{ margin: '4px 0 0' }}>Matching marking-guide level (this is the guide text, not AI reasoning): {dr.guideText}</p>
+                        {Array.isArray(dr.checklist) && dr.checklist.length > 0 && <div style={{ margin: '6px 0 0' }}>
+                          <p style={{ margin: 0 }}>Key points checked (yes/no questions answered by Jev, model-reported likelihood, not proof):</p>
+                          <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{dr.checklist.map((c: any, i: number) => <li key={i}>{c.status === 'covered' ? 'Covered' : c.status === 'not covered' ? 'Not covered' : c.status === 'uncertain' ? 'Uncertain' : 'No answer'}: {c.point}{c.p !== null && c.p !== undefined ? ` (${Math.round(c.p * 100)}%)` : ''}</li>)}</ul>
+                        </div>}
                         <button className="btn btn-sm" style={{ marginTop: 6 }} onClick={() => setMk({ ...mk, [q.id]: { marks: String(dr.marks), reason: mk[q.id]?.reason || '' } })}>Copy into marks box (you still save)</button>
                       </>}
                     </div>); })()}
