@@ -35,6 +35,9 @@ export async function takeDailySlot(): Promise<boolean> {
   return true;
 }
 
+export function jevBody(state: Record<string, string>, instructions: string, criteria: string[], checks?: Record<string, string>) {
+  return { state, model: 'jev-1.13.0', questions: { q: { type: 'score', instructions, criteria }, ...Object.fromEntries(Object.entries(checks || {}).map(([k, v]) => [k, { type: 'noul', instructions: v }])) } };
+}
 export async function jevScore(state: Record<string, string>, instructions: string, criteria: string[], checks?: Record<string, string>): Promise<JevScoreResult> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 25000);
@@ -42,7 +45,7 @@ export async function jevScore(state: Record<string, string>, instructions: stri
     const resp = await fetch('https://api.typesafe.ai/v1/systemone', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.JEV_API_KEY}` },
-      body: JSON.stringify({ state, model: 'jev-1.13.0', questions: { q: { type: 'score', instructions, criteria }, ...Object.fromEntries(Object.entries(checks || {}).map(([k, v]) => [k, { type: 'noul', instructions: v }])) } }),
+      body: JSON.stringify(jevBody(state, instructions, criteria, checks)),
       signal: ctl.signal,
     });
     if (!resp.ok) throw new Error(`jev ${resp.status}`);
@@ -89,7 +92,14 @@ export function checklist(nouls: Record<string, number> | undefined) {
 export const PILOT_PRICE_PER_TOKEN = 0.042 / 1_000_000;
 export const PILOT_MAX_CALLS = Math.min(6, Number(process.env.PILOT_MAX_CALLS || 6));
 export const PILOT_MAX_USD = Math.min(0.01, Number(process.env.PILOT_MAX_USD || 0.01));
-export function estInputTokens(parts: unknown): number { return Math.ceil(JSON.stringify(parts).length / 2) + 200; }
+// Upper bound on billed input tokens for ONE HTTP request, under deliberately pessimistic assumptions (not provider-confirmed):
+// (a) a token is never shorter than 1 UTF-8 byte, so tokens <= serialized bytes; (b) EVERY question in the request (1 Score + each yes/no) is billed as its own
+// inference over the full state; (c) each inference carries up to 2000 extra hidden prompt tokens. Real billing should be far lower; the guard still refuses past the ceiling.
+export const PILOT_HIDDEN_TOKENS_PER_QUESTION = 2000;
+export function estInputTokens(body: { state: unknown; questions: Record<string, unknown> }): number {
+  const bytes = Buffer.byteLength(JSON.stringify(body), 'utf8'); const nq = Object.keys(body.questions).length;
+  return nq * (bytes + PILOT_HIDDEN_TOKENS_PER_QUESTION);
+}
 export function estCostUsd(tokens: number): number { return tokens * PILOT_PRICE_PER_TOKEN; }
 
 // Key points come from THIS paper's own answer key (teacher-side text), never from the student's words. Max 6 yes/no checks.
