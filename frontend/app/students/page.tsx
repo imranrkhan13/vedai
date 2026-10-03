@@ -114,6 +114,15 @@ export default function StudentsPage() {
                       {dr.state === 'done' && <>
                         <p style={{ margin: '4px 0 0' }}>Suggested marks: <b>{dr.marks}/{q.marks}</b>. Model-reported confidence {Math.round(dr.confidence * 100)}% (not an accuracy figure). Model {dr.model}.</p>
                         <p style={{ margin: '4px 0 0' }}>Matching marking-guide level (this is the guide text, not AI reasoning): {dr.guideText}</p>
+                        {Array.isArray(dr.checklist) && dr.checklist.length > 0 && (() => {
+                          const cov = dr.checklist.filter((c: any) => c.status === 'covered').map((c: any) => c.point);
+                          const rest = dr.checklist.filter((c: any) => c.status !== 'covered').map((c: any) => `${c.point} (${c.status === 'not covered' ? 'not covered' : c.status === 'uncertain' ? 'unclear' : 'no answer'})`);
+                          const frac = cov.length / dr.checklist.length; const lf = q.marks ? dr.marks / q.marks : 0;
+                          return (<div style={{ margin: '6px 0 0', padding: '6px 8px', background: 'var(--gray-50)', borderRadius: 6 }}>
+                            <p style={{ margin: 0 }}><b>Why {dr.marks}/{q.marks}:</b> the closest marking-guide level is {dr.marks} marks. Jev's key-point checks found {cov.length} of {dr.checklist.length} points covered{cov.length ? ` (${cov.join('; ')})` : ''}{rest.length ? `. Not found or unclear: ${rest.join('; ')}` : ''}.</p>
+                            {Math.abs(frac - lf) > 0.4 && <p style={{ margin: '4px 0 0', color: '#b45309' }}>Check this one: the points covered and the suggested marks do not line up. Please read the answer and decide yourself.</p>}
+                            <p style={{ margin: '4px 0 0', color: 'var(--gray-500)' }}>This summary is put together by the app from Jev's returned checks and your marking guide. Jev did not write it. Percentages are model-reported, not proof.</p>
+                          </div>); })()}
                         {Array.isArray(dr.checklist) && dr.checklist.length > 0 && <div style={{ margin: '6px 0 0' }}>
                           <p style={{ margin: 0 }}>Key points checked (yes/no questions answered by Jev, model-reported likelihood, not proof):</p>
                           <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{dr.checklist.map((c: any, i: number) => <li key={i}>{c.status === 'covered' ? 'Covered' : c.status === 'not covered' ? 'Not covered' : c.status === 'uncertain' ? 'Uncertain' : 'No answer'}: {c.point}{c.p !== null && c.p !== undefined ? ` (${Math.round(c.p * 100)}%)` : ''}</li>)}</ul>
