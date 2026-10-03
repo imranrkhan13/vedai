@@ -10,6 +10,7 @@ export interface JevScoreResult {
   nouls?: Record<string, number>;
 }
 
+export function jevKeyReady(): boolean { return process.env.JEV_ENABLED === 'true' && !!process.env.JEV_API_KEY; }
 export function jevEnabled(): boolean {
   return process.env.JEV_ENABLED === 'true' && !!process.env.JEV_API_KEY && !!process.env.JEV_DEMO_USER_ID && !!process.env.JEV_DEMO_ASSIGNMENT_ID;
 }
@@ -78,5 +79,33 @@ export function checklist(nouls: Record<string, number> | undefined) {
   return Object.keys(DEMO_KEY_POINTS).map((k) => {
     const p = nouls && typeof nouls[k] === 'number' ? nouls[k] : null;
     return { point: DEMO_KEY_LABELS[k], p, status: p === null ? 'unknown' : p >= 0.7 ? 'covered' : p <= 0.3 ? 'not covered' : 'uncertain' };
+  });
+}
+
+
+// ---- Consented single-student pilot helpers ----
+// Price source: https://docs.typesafe.ai/models.md ($0.042 per million input tokens, output free). The estimate below OVER-counts (1 token per 2 characters)
+// so the enforced ceiling is conservative. The ceiling is enforced before every request, not just estimated afterwards.
+export const PILOT_PRICE_PER_TOKEN = 0.042 / 1_000_000;
+export const PILOT_MAX_CALLS = Math.min(6, Number(process.env.PILOT_MAX_CALLS || 6));
+export const PILOT_MAX_USD = Math.min(0.01, Number(process.env.PILOT_MAX_USD || 0.01));
+export function estInputTokens(parts: unknown): number { return Math.ceil(JSON.stringify(parts).length / 2) + 200; }
+export function estCostUsd(tokens: number): number { return tokens * PILOT_PRICE_PER_TOKEN; }
+
+// Key points come from THIS paper's own answer key (teacher-side text), never from the student's words. Max 6 yes/no checks.
+export function keyPointsFromKey(key: string): { checks: Record<string, string>; labels: Record<string, string> } {
+  const parts = String(key || '').split(/[.;\n]+/).map((x) => x.trim().replace(/\s+/g, ' ')).filter((x) => x.length >= 12 && x.length <= 200);
+  const seen = new Set<string>(); const checks: Record<string, string> = {}; const labels: Record<string, string> = {};
+  for (const t of parts) {
+    const k = t.toLowerCase(); if (seen.has(k)) continue; seen.add(k);
+    const id = `k${Object.keys(checks).length + 1}`; if (Object.keys(checks).length >= 6) break;
+    checks[id] = `Does \`student_answer\` make this point: "${t.replace(/"/g, "'")}"?`; labels[id] = t;
+  }
+  return { checks, labels };
+}
+export function checklistFrom(labels: Record<string, string>, nouls: Record<string, number> | undefined) {
+  return Object.keys(labels).map((k) => {
+    const p = nouls && typeof nouls[k] === 'number' ? nouls[k] : null;
+    return { point: labels[k], p, status: p === null ? 'unknown' : p >= 0.7 ? 'covered' : p <= 0.3 ? 'not covered' : 'uncertain' };
   });
 }
