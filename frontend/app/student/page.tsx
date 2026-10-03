@@ -46,7 +46,7 @@ export default function StudentPage() {
         <label style={{ fontSize: 12, fontWeight: 600 }}>Access code</label>
         <input className="input" required autoComplete="off" value={code} onChange={e => setCode(e.target.value)} placeholder="XXXXX-XXXXX" style={{ marginTop: 4 }} />
         <button className="btn btn-primary" type="submit" disabled={busy} style={{ width: '100%', marginTop: 18, justifyContent: 'center' }}>{busy ? 'Please wait...' : 'Sign in'}</button>
-        <p style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 14, lineHeight: 1.5 }}>Your answers are saved for your teacher only. They are not sent to any AI service, except the built-in made-up demo answers on the one demo paper. Marks are given by your teacher.</p>
+        <p style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 14, lineHeight: 1.5 }}>Your answers are saved for your teacher. They are not sent to any AI service, except the built-in made-up demo answers on the demo paper, or if you are the one named adult pilot student and tick the consent box after signing in. Marks are given by your teacher.</p>
       </form>
     </div>
   );
@@ -68,7 +68,7 @@ export default function StudentPage() {
           {submitted && sub.marks && <p style={{ fontSize: 13, fontWeight: 600, marginTop: 8 }}>Your teacher marked this: {sub.total} / {a.totalMarks}</p>}
           {submitted && !sub.marks && <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 8 }}>Your teacher has not shared marks yet.</p>}
         </div>
-        {me.student.ageGroup === 'adult' && (
+        {me.student.ageGroup === 'adult' && !submitted && (
           <div className="card" style={{ padding: '12px 20px', marginBottom: 10 }}>
             <label style={{ display: 'flex', gap: 8, fontSize: 12, alignItems: 'flex-start', cursor: 'pointer' }}>
               <input type="checkbox" checked={!!me.student.aiConsent} onChange={async e => { try { await api.studentConsent(e.target.checked); await load(); } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Could not save'); } }} />
@@ -100,7 +100,7 @@ export default function StudentPage() {
         {!submitted && (
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 14 }}>
             <button className="btn btn-primary" onClick={submit} disabled={busy}>{busy ? 'Submitting...' : 'Submit answers'}</button>
-            <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>Typed answers only. You can submit once. Your answers go to your teacher, not to an AI service (except the built-in made-up demo answers on the one demo paper).</span>
+            <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>Typed answers only. You can submit once. {me.student.aiPilot && me.student.aiConsent ? 'Your answers go to your teacher and, because you ticked the box above, to Typesafe for a teacher-only draft grade.' : 'Your answers go to your teacher, not to an AI service (except the built-in made-up demo answers on the one demo paper).'}</span>
           </div>
         )}
       </div>
