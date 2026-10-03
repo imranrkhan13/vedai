@@ -5,6 +5,7 @@ import { getDb } from '../services/db';
 import { Assignment, IQuestion } from '../models/Assignment';
 import { requireAuth, signToken, verifyToken } from '../services/auth';
 import { jevEnabled, JEV_FIXTURES, JEV_MAX_PER_PAPER, takeDailySlot, jevScore, DEMO_KEY_POINTS, checklist } from '../services/jev';
+import { cleanAgeGroup, feedbackFor, realAnswerAiGate } from '../services/feedback';
 import { getRedis } from '../services/redis';
 
 // Student portal: the teacher adds students to one assignment and gives each a teacher-chosen student ID.
@@ -39,13 +40,13 @@ async function ownedAssignment(req: Request, res: Response) {
   if (!a || a.status !== 'completed' || !a.output) { res.status(404).json({ success: false, error: 'Not found' }); return null; }
   return a;
 }
-async function insertStudent(assignmentId: string, ownerId: string, studentId: string, name: string | null): Promise<{ id: string; code: string } | 'dup'> {
+async function insertStudent(assignmentId: string, ownerId: string, studentId: string, name: string | null, ageGroup = 'unknown'): Promise<{ id: string; code: string } | 'dup'> {
   for (let i = 0; i < 5; i++) {
     const code = newCode();
     try {
       const { rows } = await getDb().query(
-        'INSERT INTO vedai_students (assignment_id, owner_id, student_code, name, access_hash) VALUES ($1,$2,$3,$4,$5) RETURNING id',
-        [assignmentId, ownerId, studentId, name, hashCode(code)]
+        'INSERT INTO vedai_students (assignment_id, owner_id, student_code, name, access_hash, age_group) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
+        [assignmentId, ownerId, studentId, name, hashCode(code), cleanAgeGroup(ageGroup)]
       );
       return { id: rows[0].id, code };
     } catch (e: any) {
@@ -68,17 +69,18 @@ teacherRoster.use(requireAuth);
 const AddSchema = z.object({
   studentId: z.string().trim().regex(/^[A-Za-z0-9._-]{1,32}$/, 'Use letters, numbers, dot, dash or underscore, up to 32 characters, no spaces'),
   name: z.string().trim().max(60).optional(),
+  ageGroup: z.enum(['under18', 'adult', 'unknown']).optional(),
 });
 
 teacherRoster.get('/:aid', async (req: Request, res: Response) => {
   try {
     const a = await ownedAssignment(req, res); if (!a) return;
     const { rows } = await getDb().query(
-      `SELECT s.id, s.student_code, s.name, s.created_at, b.submitted_at, b.late, b.released, b.marks
+      `SELECT s.id, s.student_code, s.name, s.age_group, s.ai_consent, s.created_at, b.submitted_at, b.late, b.released, b.marks
          FROM vedai_students s LEFT JOIN vedai_submissions b ON b.student_row_id = s.id
         WHERE s.assignment_id = $1 AND s.owner_id = $2 ORDER BY s.student_code`, [a._id, req.userId]);
     const max = flatQuestions(a).reduce((n, q) => n + q.marks, 0);
-    return res.json({ success: true, data: { totalMarks: max, students: rows.map((r) => ({ id: r.id, studentId: r.student_code, name: r.name || '', submitted: !!r.submitted_at, submittedAt: r.submitted_at, late: !!r.late, released: !!r.released, markedTotal: r.submitted_at ? totalMarks(r.marks) : null })) } });
+    return res.json({ success: true, data: { totalMarks: max, students: rows.map((r) => ({ id: r.id, studentId: r.student_code, name: r.name || '', ageGroup: r.age_group, aiConsent: !!r.ai_consent, submitted: !!r.submitted_at, submittedAt: r.submitted_at, late: !!r.late, released: !!r.released, markedTotal: r.submitted_at ? totalMarks(r.marks) : null })) } });
   } catch { return res.status(500).json({ success: false, error: 'Failed to load students' }); }
 });
 
@@ -89,7 +91,7 @@ teacherRoster.post('/:aid', async (req: Request, res: Response) => {
     const a = await ownedAssignment(req, res); if (!a) return;
     const c = await getDb().query('SELECT count(*)::int AS n FROM vedai_students WHERE assignment_id=$1', [a._id]);
     if (c.rows[0].n >= MAX_STUDENTS) return res.status(400).json({ success: false, error: `Up to ${MAX_STUDENTS} students per assignment` });
-    const r = await insertStudent(a._id, req.userId!, p.data.studentId, p.data.name ? strip(p.data.name) : null);
+    const r = await insertStudent(a._id, req.userId!, p.data.studentId, p.data.name ? strip(p.data.name) : null, p.data.ageGroup);
     if (r === 'dup') return res.status(409).json({ success: false, error: 'That student ID is already on this assignment' });
     return res.status(201).json({ success: true, data: { id: r.id, studentId: p.data.studentId, accessCode: showCode(r.code) } });
   } catch { return res.status(500).json({ success: false, error: 'Could not add student' }); }
@@ -118,6 +120,17 @@ teacherRoster.post('/:aid/:sid/reset', async (req: Request, res: Response) => {
   } catch { return res.status(500).json({ success: false, error: 'Could not reset the code' }); }
 });
 
+teacherRoster.patch('/:aid/:sid/age-group', async (req: Request, res: Response) => {
+  try {
+    const p = z.object({ ageGroup: z.enum(['under18', 'adult', 'unknown']) }).safeParse(req.body);
+    if (!p.success) return res.status(400).json({ success: false, error: 'Choose under 18, 18 or over, or not set.' });
+    const o = await ownedStudent(req, res); if (!o) return;
+    // Changing the group clears any earlier AI agreement: consent belongs to an adult who gave it.
+    await getDb().query('UPDATE vedai_students SET age_group=$2, ai_consent=false WHERE id=$1', [o.s.id, p.data.ageGroup]);
+    return res.json({ success: true, data: { ageGroup: p.data.ageGroup } });
+  } catch { return res.status(500).json({ success: false, error: 'Could not save' }); }
+});
+
 teacherRoster.delete('/:aid/:sid', async (req: Request, res: Response) => {
   try {
     const o = await ownedStudent(req, res); if (!o) return;
@@ -133,7 +146,7 @@ teacherRoster.get('/:aid/:sid', async (req: Request, res: Response) => {
     const { rows } = await getDb().query('SELECT * FROM vedai_submissions WHERE student_row_id=$1', [o.s.id]);
     const b = rows[0];
     const questions = flatQuestions(o.a).map((q, i) => ({ id: q.id, number: i + 1, text: q.text, marks: q.marks, type: q.type, options: q.options || [], answerKey: q.answer || '', rubric: q.rubric || [] }));
-    return res.json({ success: true, data: { student: { id: o.s.id, studentId: o.s.student_code, name: o.s.name || '' }, questions, submitted: !!b, submittedAt: b?.submitted_at || null, late: !!b?.late, answers: b?.answers || {}, marks: b?.marks || {}, released: !!b?.released, draft: draftView(b?.draft) } });
+    return res.json({ success: true, data: { student: { id: o.s.id, studentId: o.s.student_code, name: o.s.name || '', ageGroup: o.s.age_group, aiConsent: !!o.s.ai_consent, aiGate: realAnswerAiGate(o.s).why }, questions, submitted: !!b, submittedAt: b?.submitted_at || null, late: !!b?.late, answers: b?.answers || {}, marks: b?.marks || {}, released: !!b?.released, draft: draftView(b?.draft) } });
   } catch { return res.status(500).json({ success: false, error: 'Failed to load' }); }
 });
 
@@ -280,12 +293,23 @@ studentPortal.get('/me', requireStudent, async (req: Request, res: Response) => 
     const qs = flatQuestions(a);
     const questions = qs.map((q, i) => ({ id: q.id, number: i + 1, text: q.text, marks: q.marks, type: q.type, options: q.options || [] }));
     const released = !!b?.released;
+    const feedback: Record<string, any> = {};
+    if (released) for (const q of qs) { const f = feedbackFor(s.age_group, q.marks, (b.marks || {})[q.id]); if (f) feedback[q.id] = f; }
     return res.json({ success: true, data: {
-      student: { studentId: s.student_code, name: s.name || '' },
+      student: { studentId: s.student_code, name: s.name || '', ageGroup: s.age_group, aiConsent: !!s.ai_consent },
       assignment: { title: a.title, subject: a.subject, dueDate: a.dueDate, totalMarks: qs.reduce((n, q) => n + q.marks, 0), questions },
-      submission: b ? { submitted: true, submittedAt: b.submitted_at, late: !!b.late, answers: b.answers || {}, released, marks: released ? b.marks || {} : null, total: released ? totalMarks(b.marks) : null } : { submitted: false },
+      submission: b ? { submitted: true, submittedAt: b.submitted_at, late: !!b.late, answers: b.answers || {}, released, marks: released ? b.marks || {} : null, total: released ? totalMarks(b.marks) : null, feedback: released ? feedback : null } : { submitted: false },
     } });
   } catch { return res.status(500).json({ success: false, error: 'Failed to load' }); }
+});
+
+// An adult student may record whether they agree to send a typed answer to an AI service. Under 18 and unset cannot. Recording it does not switch anything on.
+studentPortal.post('/consent', requireStudent, async (req: Request, res: Response) => {
+  const p = z.object({ agree: z.boolean() }).safeParse(req.body);
+  if (!p.success) return res.status(400).json({ success: false, error: 'Invalid' });
+  if (req.studentRow.age_group !== 'adult') return res.status(403).json({ success: false, error: 'Your teacher has not marked you as 18 or over.' });
+  await getDb().query('UPDATE vedai_students SET ai_consent=$2 WHERE id=$1', [req.studentRow.id, p.data.agree]);
+  return res.json({ success: true, data: { aiConsent: p.data.agree } });
 });
 
 const SubmitSchema = z.object({ answers: z.record(z.string().max(100), z.string().max(MAX_ANSWER)) });
