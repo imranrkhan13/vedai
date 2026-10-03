@@ -4,12 +4,14 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/ui/Topbar';
 import { api } from '@/lib/api';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import toast from 'react-hot-toast';
 import { ArrowLeft } from 'lucide-react';
 
 type Row = { id: string; studentId: string; name: string; submitted: boolean; submittedAt: string | null; late: boolean; released: boolean; markedTotal: number | null; ageGroup?: string; aiConsent?: boolean };
 
 export default function StudentsPage() {
+  const [confirm, confirmNode] = useConfirm();
   const router = useRouter();
   const [aid, setAid] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
@@ -34,11 +36,11 @@ export default function StudentsPage() {
     finally { setBusy(false); }
   };
   const reset = async (r: Row) => {
-    if (!window.confirm(`Make a new access code for ${r.studentId}? The old code and any open session stop working.`)) return;
+    if (!(await confirm(`Make a new access code for ${r.studentId}? The old code and any open session stop working.`, 'Make new code'))) return;
     try { const x = await api.rosterReset(aid, r.id); setFresh({ studentId: r.studentId, code: x.accessCode }); } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Failed'); }
   };
   const remove = async (r: Row) => {
-    if (!window.confirm(`Remove ${r.studentId} and any submission they made? This cannot be undone.`)) return;
+    if (!(await confirm(`Remove ${r.studentId} and any submission they made? This cannot be undone.`, 'Remove'))) return;
     try { await api.rosterRemove(aid, r.id); if (open === r.id) { setOpen(''); setDetail(null); } await load(aid); } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Failed'); }
   };
   const view = async (r: Row) => {
@@ -61,6 +63,7 @@ export default function StudentsPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
+      {confirmNode}
       <Sidebar />
       <main className="main-content" style={{ marginLeft: 248, flex: 1, minWidth: 0 }}>
         <Topbar>
@@ -138,7 +141,7 @@ export default function StudentsPage() {
                         <button className="btn btn-sm" style={{ marginTop: 6 }} onClick={() => setMk({ ...mk, [q.id]: { marks: String(dr.marks), reason: mk[q.id]?.reason || '' } })}>Copy into marks box (you still save)</button>
                       </>}
                     </div>); })()}
-                  {detail.preview?.[q.id] && <p style={{ fontSize: 12, margin: '6px 0', padding: '6px 8px', background: 'var(--gray-50)', borderRadius: 6 }}><b>What the student will see once you share ({detail.student.ageGroup === 'adult' ? '18 or over wording' : detail.student.ageGroup === 'under18' ? 'under 18 wording' : 'age group not set, simple wording'}), from your saved marks:</b> {detail.preview[q.id].text}</p>}
+                  {detail.preview?.[q.id] && <p style={{ fontSize: 12, margin: '6px 0', padding: '6px 8px', background: 'var(--gray-50)', borderRadius: 6 }}><b>{detail.released ? 'What the student sees now' : 'What the student will see once you share'} ({detail.student.ageGroup === 'adult' ? '18 or over wording' : detail.student.ageGroup === 'under18' ? 'under 18 wording' : 'age group not set, simple wording'}), from your saved marks:</b> {detail.preview[q.id].text}</p>}
                   {q.answerKey && <p style={{ fontSize: 11, color: 'var(--gray-500)' }}>Answer key (AI draft): {q.answerKey}</p>}
                   {q.rubric.length === 3 && <p style={{ fontSize: 11, color: 'var(--gray-500)' }}>Levels (AI draft): {q.rubric.map((l: any) => `${l.marks}: ${l.descriptor}`).join(' | ')}</p>}
                   <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
