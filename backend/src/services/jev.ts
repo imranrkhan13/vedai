@@ -8,6 +8,7 @@ export interface JevScoreResult {
   probabilities: Record<string, number>;
   model: string;
   nouls?: Record<string, number>;
+  usageInputTokens?: number;
 }
 
 export function jevKeyReady(): boolean { return process.env.JEV_ENABLED === 'true' && !!process.env.JEV_API_KEY; }
@@ -54,7 +55,8 @@ export async function jevScore(state: Record<string, string>, instructions: stri
     if (!a || a.type !== 'score' || typeof a.score !== 'number' || !a.probabilities) throw new Error('jev bad shape');
     const nouls: Record<string, number> = {};
     for (const k of Object.keys(checks || {})) { const x = j?.answers?.[k]; if (x && x.type === 'noul' && typeof x.noul === 'number') nouls[k] = x.noul; }
-    return { score: a.score, confidence: Number(a.confidence), probabilities: a.probabilities, model: String(j.model || 'jev-1.13.0'), nouls };
+    const ut = Number(j?.usage?.input_tokens);
+    return { score: a.score, confidence: Number(a.confidence), probabilities: a.probabilities, model: String(j.model || 'jev-1.13.0'), nouls, usageInputTokens: Number.isFinite(ut) && ut >= 0 ? ut : undefined };
   } finally {
     clearTimeout(t);
   }
@@ -92,14 +94,11 @@ export function checklist(nouls: Record<string, number> | undefined) {
 export const PILOT_PRICE_PER_TOKEN = 0.042 / 1_000_000;
 export const PILOT_MAX_CALLS = Math.min(6, Number(process.env.PILOT_MAX_CALLS || 6));
 export const PILOT_MAX_USD = Math.min(0.01, Number(process.env.PILOT_MAX_USD || 0.01));
-// Upper bound on billed input tokens for ONE HTTP request, under deliberately pessimistic assumptions (not provider-confirmed):
-// (a) a token is never shorter than 1 UTF-8 byte, so tokens <= serialized bytes; (b) EVERY question in the request (1 Score + each yes/no) is billed as its own
-// inference over the full state; (c) each inference carries up to 2000 extra hidden prompt tokens. Real billing should be far lower; the guard still refuses past the ceiling.
-export const PILOT_HIDDEN_TOKENS_PER_QUESTION = 2000;
-export function estInputTokens(body: { state: unknown; questions: Record<string, unknown> }): number {
-  const bytes = Buffer.byteLength(JSON.stringify(body), 'utf8'); const nq = Object.keys(body.questions).length;
-  return nq * (bytes + PILOT_HIDDEN_TOKENS_PER_QUESTION);
-}
+// Reservation per request = the DOCUMENTED per-request input limit (https://docs.typesafe.ai/models.md: 64k tokens per request) at the list price.
+// It is reserved before every call and replaced by the real usage.input_tokens from the response (https://docs.typesafe.ai/api.md). If usage is missing or the call fails,
+// the full reservation stays counted. Open question (not provider-confirmed): whether usage for a multi-question request can exceed the 64k context limit.
+export const PILOT_MAX_TOKENS_PER_REQUEST = 64000;
+export const PILOT_RESERVE_USD = PILOT_MAX_TOKENS_PER_REQUEST * PILOT_PRICE_PER_TOKEN;
 export function estCostUsd(tokens: number): number { return tokens * PILOT_PRICE_PER_TOKEN; }
 
 // Key points come from THIS paper's own answer key (teacher-side text), never from the student's words. Max 6 yes/no checks.
