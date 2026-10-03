@@ -118,3 +118,17 @@ export function checklistFrom(labels: Record<string, string>, nouls: Record<stri
     return { point: labels[k], p, status: p === null ? 'unknown' : p >= 0.7 ? 'covered' : p <= 0.3 ? 'not covered' : 'uncertain' };
   });
 }
+
+// One yes/no (Noul) question as its OWN request (pilot: one question per request). Returns the model-reported likelihood and real billed input tokens.
+export async function jevNoulOne(state: Record<string, string>, instruction: string): Promise<{ p: number; usageInputTokens?: number }> {
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 25000);
+  try {
+    const resp = await fetch('https://api.typesafe.ai/v1/systemone', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.JEV_API_KEY}` },
+      body: JSON.stringify({ state, model: 'jev-1.13.0', questions: { k: { type: 'noul', instructions: instruction } } }), signal: ctl.signal });
+    if (!resp.ok) throw new Error(`jev ${resp.status}`);
+    const j: any = await resp.json(); const x = j?.answers?.k;
+    if (!x || x.type !== 'noul' || typeof x.noul !== 'number') throw new Error('jev bad shape');
+    const ut = Number(j?.usage?.input_tokens);
+    return { p: x.noul, usageInputTokens: Number.isFinite(ut) && ut >= 0 ? ut : undefined };
+  } finally { clearTimeout(t); }
+}
