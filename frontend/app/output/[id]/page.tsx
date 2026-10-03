@@ -5,6 +5,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/ui/Topbar';
 import { useAssignmentStore } from '@/store/assignmentStore';
 import { api } from '@/lib/api';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { Section, Question } from '@/types';
 import toast from 'react-hot-toast';
 import { Loader2, Download, RefreshCw, Copy, Check, ArrowLeft, CheckCircle } from 'lucide-react';
@@ -56,6 +57,7 @@ function RubricGuide({ a, onSaved }:{ a:any; onSaved:()=>void }){
 }
 
 function GradingDemo({ a, onChanged }:{ a:any; onChanged:()=>void }){
+  const [confirm, confirmNode] = useConfirm();
   const qs:Question[] = (a.output.sections as Section[]).flatMap((sec:Section)=>sec.questions).filter((q:Question)=>q.rubric&&q.rubric.length===3);
   const [ans,setAns] = useState<Record<string,string>>({});
   const [marks,setMarks] = useState<Record<string,string>>({});
@@ -66,7 +68,7 @@ function GradingDemo({ a, onChanged }:{ a:any; onChanged:()=>void }){
   const run = async (q:Question)=>{
     const f = ans[q.id]||'full';
     let overwrite = false;
-    if(q.grade&&q.grade.edited){ if(!window.confirm('You already saved your own marks here. Grade again? Your earlier result is kept in history, but the draft is replaced.')) return; overwrite = true; }
+    if(q.grade&&q.grade.edited){ if(!(await confirm('You already saved your own marks here. Grade again? Your earlier result is kept in history, but the draft is replaced.','Grade again'))) return; overwrite = true; }
     setBusy(q.id);
     try { await api.gradeAnswer(id, q.id, f, overwrite); toast.success('Draft marks ready for your review'); onChanged(); }
     catch(err:unknown){ toast.error(err instanceof Error?err.message:'Could not grade'); }
@@ -82,6 +84,7 @@ function GradingDemo({ a, onChanged }:{ a:any; onChanged:()=>void }){
   };
   return (
     <div className="card fade-up" style={{ padding:'16px 20px', marginTop:14, maxWidth:760 }}>
+      {confirmNode}
       <h3 style={{ fontSize:14, fontWeight:700, color:'var(--black)', marginBottom:4 }}>Grading demo (synthetic answers only)</h3>
       <p style={{ fontSize:11, color:'var(--gray-500)', lineHeight:1.5, marginBottom:12 }}>Demo only, limited to one approved demo account. You pick one of three built-in made-up answers; you cannot type or upload your own. The built-in answer is sent to TypeSafe&apos;s Jev model, which picks the marking level that fits best. The draft marks and the confidence are the model&apos;s, they are not proof the marks are right. The confidence shows how sure the model is, not whether it is correct. You decide the final marks. Limited number of gradings per paper and per day.</p>
       {qs.map((q,qi)=>{ const g=q.grade; return (
