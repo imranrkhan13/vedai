@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { getDb } from '../services/db';
 import { Assignment, IQuestion } from '../models/Assignment';
 import { requireAuth, signToken, verifyToken } from '../services/auth';
-import { jevEnabled, jevKeyReady, JEV_FIXTURES, JEV_MAX_PER_PAPER, takeDailySlot, jevScore, DEMO_KEY_POINTS, checklist, PILOT_MAX_CALLS, PILOT_MAX_USD, estInputTokens, estCostUsd, keyPointsFromKey, checklistFrom } from '../services/jev';
+import { jevEnabled, jevKeyReady, JEV_FIXTURES, JEV_MAX_PER_PAPER, takeDailySlot, jevScore, jevBody, DEMO_KEY_POINTS, checklist, PILOT_MAX_CALLS, PILOT_MAX_USD, estInputTokens, estCostUsd, keyPointsFromKey, checklistFrom } from '../services/jev';
 import { cleanAgeGroup, feedbackFor, realAnswerAiGate } from '../services/feedback';
 import { getRedis } from '../services/redis';
 
@@ -212,8 +212,8 @@ async function runPilotDraft(student: any, q: IQuestion, answer: string): Promis
     const asc = [...(q.rubric || [])].sort((x, y) => x.marks - y.marks).map((l) => ({ marks: Math.min(l.marks, q.marks), descriptor: l.descriptor }));
     const { checks, labels } = keyPointsFromKey(q.answer || '');
     const instr = 'How well does `student_answer` answer `exam_question`? Judge it only against the levels.';
-    const cost = estCostUsd(estInputTokens({ state: { exam_question: q.text, student_answer: answer }, instr, criteria: asc.map((l) => l.descriptor), checks }));
-    // Hard ceiling, reserved atomically BEFORE the request: at most PILOT_MAX_CALLS requests and PILOT_MAX_USD estimated (over-counted) spend for this student.
+    const cost = estCostUsd(estInputTokens(jevBody({ exam_question: q.text, student_answer: answer }, instr, asc.map((l) => l.descriptor), checks)));
+    // Hard ceiling, reserved atomically BEFORE the request: at most PILOT_MAX_CALLS requests and PILOT_MAX_USD upper-bound spend for this student.
     const rsv = await getDb().query('UPDATE vedai_students SET pilot_calls = pilot_calls + 1, pilot_cost_usd = pilot_cost_usd + $2 WHERE id=$1 AND pilot_calls < $3 AND pilot_cost_usd + $2 <= $4 RETURNING pilot_calls', [student.id, cost, PILOT_MAX_CALLS, PILOT_MAX_USD]);
     if (!(rsv.rowCount ?? 0)) return await save({ state: 'failed', note: 'Pilot request or spend limit reached. Mark by hand.', at: new Date().toISOString() });
     if (!(await takeDailySlot())) return await save({ state: 'failed', note: 'Daily limit reached. Mark by hand.', at: new Date().toISOString() });
