@@ -378,6 +378,13 @@ export default function OutputPage() {
                 </div>
               </div>
 
+              <div className="card fade-up" style={{ padding:'14px 20px', marginTop:14, maxWidth:760, display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
+                <div style={{ flex:'1 1 260px' }}>
+                  <p style={{ fontSize:13, fontWeight:600, color:'var(--black)' }}>Students and submissions</p>
+                  <p style={{ fontSize:11, color:'var(--gray-500)', lineHeight:1.5 }}>Give each student an ID and an access code, let them submit typed answers, then mark them yourself. Answers are not sent to any AI service.</p>
+                </div>
+                <a className="btn btn-ghost" href={`/students?a=${a._id||(a as any).id}`} style={{ fontSize:12, textDecoration:'none' }}>Open students</a>
+              </div>
               <RubricGuide key={JSON.stringify((a.output.sections as Section[]).flatMap((x:Section)=>x.questions.map((y:Question)=>y.rubric||null)))} a={a} onSaved={()=>{ api.getAssignment(a._id||(a as any).id).then(()=>window.location.reload()).catch(()=>window.location.reload()); }}/>
 
               <GradingDemo key={'g'+JSON.stringify((a.output.sections as Section[]).flatMap((x:Section)=>x.questions.map((y:Question)=>y.grade||null)))} a={a} onChanged={()=>window.location.reload()}/>
@@ -398,4 +405,4 @@ export default function OutputPage() {
       </main>
     </div>
   );
-                    }
+}
