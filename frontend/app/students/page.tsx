@@ -68,7 +68,7 @@ export default function StudentsPage() {
         <div style={{ padding: '20px 28px 60px', maxWidth: 820 }}>
           <h1 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>Students and submissions</h1>
           <p style={{ fontSize: 12, color: 'var(--gray-500)', lineHeight: 1.6, marginBottom: 14 }}>
-            You choose each student ID. The ID is not a password: every student also gets a random access code that you pass to them yourself. Students sign in at <b>/student</b> on this site, answer in typed text, and you mark by hand. Student answers are stored in this app and are not sent to any AI service. Use an ID or first name only, and follow your school's rules for student data. This has not been security audited.
+            You choose each student ID. The ID is not a password: every student also gets a random access code that you pass to them yourself. Students sign in at <b>/student</b> on this site, answer in typed text, and you mark by hand. Student answers are stored in this app and are not sent to any AI service, except the built-in SYNTHETIC demo answers on the one approved demo paper, which can get a teacher-only AI draft. Use an ID or first name only, and follow your school's rules for student data. This has not been security audited.
           </p>
           {!aid && !loading && <p style={{ fontSize: 13 }}>Open this page from an assignment.</p>}
           {aid && (
@@ -106,6 +106,17 @@ export default function StudentsPage() {
                 <div key={q.id} style={{ borderTop: qi ? '1px solid var(--border)' : 'none', paddingTop: qi ? 12 : 0, marginTop: qi ? 12 : 0 }}>
                   <p style={{ fontSize: 13, fontWeight: 600 }}>{q.number}. {q.text} <span style={{ color: 'var(--gray-500)', fontWeight: 500 }}>[max {q.marks}]</span></p>
                   <p style={{ fontSize: 13, whiteSpace: 'pre-wrap', margin: '6px 0', padding: '8px 10px', background: 'var(--gray-50)', borderRadius: 8 }}>{detail.answers[q.id] || '(no answer)'}</p>
+                  {(() => { const dr = detail.draft?.[q.id]; if (!dr) return null; return (
+                    <div style={{ margin: '6px 0', padding: '8px 10px', border: '1px dashed var(--gray-300)', borderRadius: 8, fontSize: 12 }} role="status">
+                      <b>AI draft for you only (SYNTHETIC demo, not final marks)</b>
+                      {dr.state === 'pending' && <p style={{ margin: '4px 0 0' }}>Drafting... <button className="btn btn-sm" onClick={() => view({ id: open } as Row)}>Refresh</button></p>}
+                      {dr.state === 'failed' && <p style={{ margin: '4px 0 0' }}>No draft: {dr.note || 'Mark by hand.'}</p>}
+                      {dr.state === 'done' && <>
+                        <p style={{ margin: '4px 0 0' }}>Suggested marks: <b>{dr.marks}/{q.marks}</b>. Model-reported confidence {Math.round(dr.confidence * 100)}% (not an accuracy figure). Model {dr.model}.</p>
+                        <p style={{ margin: '4px 0 0' }}>Matching marking-guide level (this is the guide text, not AI reasoning): {dr.guideText}</p>
+                        <button className="btn btn-sm" style={{ marginTop: 6 }} onClick={() => setMk({ ...mk, [q.id]: { marks: String(dr.marks), reason: mk[q.id]?.reason || '' } })}>Copy into marks box (you still save)</button>
+                      </>}
+                    </div>); })()}
                   {q.answerKey && <p style={{ fontSize: 11, color: 'var(--gray-500)' }}>Answer key (AI draft): {q.answerKey}</p>}
                   {q.rubric.length === 3 && <p style={{ fontSize: 11, color: 'var(--gray-500)' }}>Levels (AI draft): {q.rubric.map((l: any) => `${l.marks}: ${l.descriptor}`).join(' | ')}</p>}
                   <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
