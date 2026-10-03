@@ -36,3 +36,5 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
 <!-- deployed on Vercel: set API_PROXY_URL to the backend URL -->
+
+Age group is a group only (under 18, 18 or over, not set), never a date of birth. It changes data permission and feedback wording, not marks.
