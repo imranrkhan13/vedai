@@ -115,13 +115,14 @@ export default function StudentsPage() {
                         <p style={{ margin: '4px 0 0' }}>Suggested marks: <b>{dr.marks}/{q.marks}</b>. Model-reported confidence {Math.round(dr.confidence * 100)}% (not an accuracy figure). Model {dr.model}.</p>
                         <p style={{ margin: '4px 0 0' }}>Matching marking-guide level (this is the guide text, not AI reasoning): {dr.guideText}</p>
                         {Array.isArray(dr.checklist) && dr.checklist.length > 0 && (() => {
-                          const cov = dr.checklist.filter((c: any) => c.status === 'covered').map((c: any) => c.point);
-                          const rest = dr.checklist.filter((c: any) => c.status !== 'covered').map((c: any) => `${c.point} (${c.status === 'not covered' ? 'not covered' : c.status === 'uncertain' ? 'unclear' : 'no answer'})`);
-                          const frac = cov.length / dr.checklist.length; const lf = q.marks ? dr.marks / q.marks : 0;
+                          const by = (st: string) => dr.checklist.filter((c: any) => c.status === st).map((c: any) => c.point);
+                          const cov = by('covered'), unc = [...by('uncertain'), ...by('unknown')], nc = by('not covered');
+                          const review = unc.length > 0 || dr.confidence < 0.7;
                           return (<div style={{ margin: '6px 0 0', padding: '6px 8px', background: 'var(--gray-50)', borderRadius: 6 }}>
-                            <p style={{ margin: 0 }}><b>Why {dr.marks}/{q.marks}:</b> the closest marking-guide level is {dr.marks} marks. Jev's key-point checks found {cov.length} of {dr.checklist.length} points covered{cov.length ? ` (${cov.join('; ')})` : ''}{rest.length ? `. Not found or unclear: ${rest.join('; ')}` : ''}.</p>
-                            {Math.abs(frac - lf) > 0.4 && <p style={{ margin: '4px 0 0', color: '#b45309' }}>Check this one: the points covered and the suggested marks do not line up. Please read the answer and decide yourself.</p>}
-                            <p style={{ margin: '4px 0 0', color: 'var(--gray-500)' }}>This summary is put together by the app from Jev's returned checks and your marking guide. Jev did not write it. Percentages are model-reported, not proof.</p>
+                            <p style={{ margin: 0 }}><b>Grade and supporting checks</b></p>
+                            <p style={{ margin: '4px 0 0' }}>Draft grade: {dr.marks}/{q.marks}, the closest marking-guide level (shown above). Jev's separate key-point checks: covered {cov.length}{cov.length ? ` (${cov.join('; ')})` : ''}; not covered {nc.length}{nc.length ? ` (${nc.join('; ')})` : ''}; uncertain {unc.length}{unc.length ? ` (${unc.join('; ')})` : ''}.</p>
+                            {review && <p style={{ margin: '4px 0 0', color: '#b45309' }}>Needs your review: {unc.length > 0 ? 'some points are uncertain' : 'the model-reported confidence is low'}. Read the answer against the marking guide before you save marks.</p>}
+                            <p style={{ margin: '4px 0 0', color: 'var(--gray-500)' }}>The grade is not calculated from these checks and no formula links them. The checks come from Jev's yes/no answers; this summary is assembled by the app, not written by Jev. Percentages are model-reported, not proof.</p>
                           </div>); })()}
                         {Array.isArray(dr.checklist) && dr.checklist.length > 0 && <div style={{ margin: '6px 0 0' }}>
                           <p style={{ margin: 0 }}>Key points checked (yes/no questions answered by Jev, model-reported likelihood, not proof):</p>
