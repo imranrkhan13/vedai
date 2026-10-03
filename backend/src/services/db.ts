@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS vedai_submissions (
   submitted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE vedai_students ADD COLUMN IF NOT EXISTS age_group TEXT NOT NULL DEFAULT 'unknown';
+ALTER TABLE vedai_students ADD COLUMN IF NOT EXISTS ai_consent BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE vedai_submissions ADD COLUMN IF NOT EXISTS draft JSONB NOT NULL DEFAULT '{}'::jsonb;
 CREATE INDEX IF NOT EXISTS vedai_assignments_created_at_idx ON vedai_assignments (created_at DESC);
 `;
