@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { ArrowLeft } from 'lucide-react';
 
-type Row = { id: string; studentId: string; name: string; submitted: boolean; submittedAt: string | null; late: boolean; released: boolean; markedTotal: number | null };
+type Row = { id: string; studentId: string; name: string; submitted: boolean; submittedAt: string | null; late: boolean; released: boolean; markedTotal: number | null; ageGroup?: string; aiConsent?: boolean };
 
 export default function StudentsPage() {
   const router = useRouter();
@@ -18,6 +18,7 @@ export default function StudentsPage() {
   const [sid, setSid] = useState('');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [age, setAge] = useState('unknown');
   const [fresh, setFresh] = useState<{ studentId: string; code: string } | null>(null);
   const [open, setOpen] = useState<string>('');
   const [detail, setDetail] = useState<any>(null);
@@ -28,7 +29,7 @@ export default function StudentsPage() {
 
   const add = async (e: React.FormEvent) => {
     e.preventDefault(); if (busy) return; setBusy(true);
-    try { const r = await api.rosterAdd(aid, sid.trim(), name.trim()); setFresh({ studentId: r.studentId, code: r.accessCode }); setSid(''); setName(''); await load(aid); }
+    try { const r = await api.rosterAdd(aid, sid.trim(), name.trim(), age); setFresh({ studentId: r.studentId, code: r.accessCode }); setSid(''); setName(''); await load(aid); }
     catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Could not add'); }
     finally { setBusy(false); }
   };
@@ -70,11 +71,15 @@ export default function StudentsPage() {
           <p style={{ fontSize: 12, color: 'var(--gray-500)', lineHeight: 1.6, marginBottom: 14 }}>
             You choose each student ID. The ID is not a password: every student also gets a random access code that you pass to them yourself. Students sign in at <b>/student</b> on this site, answer in typed text, and you mark by hand. Student answers are stored in this app and are not sent to any AI service, except the built-in SYNTHETIC demo answers on the one approved demo paper, which can get a teacher-only AI draft. Use an ID or first name only, and follow your school's rules for student data. This has not been security audited.
           </p>
+          <p style={{ fontSize: 12, color: 'var(--gray-500)', lineHeight: 1.6, marginBottom: 14 }}>
+            Age group (a group only, never a date of birth) does two things. Under 18 and not set: answers are never offered for AI drafting, marking is by you only. 18 or over: the student can record whether they agree to AI drafting, but typed answers are not sent to any AI service at all right now. It never changes marks: the same answer gets the marks you give it. It only changes how the marks you shared are worded to the student (shorter and simpler for under 18 and not set, fuller for 18 or over). Wording uses only your marks and comment.
+          </p>
           {!aid && !loading && <p style={{ fontSize: 13 }}>Open this page from an assignment.</p>}
           {aid && (
             <form onSubmit={add} className="card" style={{ padding: '14px 20px', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 14 }}>
               <div style={{ flex: '1 1 140px' }}><label style={{ fontSize: 12, fontWeight: 600 }}>Student ID</label><input className="input" required value={sid} onChange={e => setSid(e.target.value)} placeholder="e.g. 7B-014" style={{ marginTop: 4 }} /></div>
               <div style={{ flex: '1 1 140px' }}><label style={{ fontSize: 12, fontWeight: 600 }}>Name (optional)</label><input className="input" value={name} onChange={e => setName(e.target.value)} maxLength={60} style={{ marginTop: 4 }} /></div>
+              <div style={{ flex: '1 1 140px' }}><label style={{ fontSize: 12, fontWeight: 600 }}>Age group</label><select className="input" value={age} onChange={e => setAge(e.target.value)} style={{ marginTop: 4 }}><option value="unknown">Not set</option><option value="under18">Under 18</option><option value="adult">18 or over</option></select></div>
               <button className="btn btn-primary" type="submit" disabled={busy}>{busy ? 'Adding...' : 'Add student'}</button>
             </form>
           )}
@@ -93,6 +98,7 @@ export default function StudentsPage() {
                 <p style={{ fontSize: 13, fontWeight: 600 }}>{r.studentId}{r.name ? ` (${r.name})` : ''}</p>
                 <p style={{ fontSize: 11, color: 'var(--gray-500)' }}>{r.submitted ? `Submitted ${new Date(r.submittedAt as string).toLocaleString()}${r.late ? ', late' : ''}${r.markedTotal ? ` - marked ${r.markedTotal}/${max}` : ''}${r.released ? ' - shared' : ''}` : 'Not submitted'}</p>
               </div>
+              <select className="input" aria-label={`Age group for ${r.studentId}`} value={r.ageGroup || 'unknown'} onChange={async e => { try { await api.rosterAge(aid, r.id, e.target.value); await load(aid); } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Could not save'); } }} style={{ width: 120, fontSize: 12 }}><option value="unknown">Not set</option><option value="under18">Under 18</option><option value="adult">18 or over</option></select>
               {r.submitted && <button className="btn btn-orange btn-sm" onClick={() => view(r)}>Review</button>}
               <button className="btn btn-ghost btn-sm" onClick={() => reset(r)}>New code</button>
               <button className="btn btn-ghost btn-sm" onClick={() => remove(r)}>Remove</button>
