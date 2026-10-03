@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { getDb } from '../services/db';
 import { Assignment, IQuestion } from '../models/Assignment';
 import { requireAuth, signToken, verifyToken } from '../services/auth';
+import { jevEnabled, JEV_FIXTURES, JEV_MAX_PER_PAPER, takeDailySlot, jevScore } from '../services/jev';
+import { getRedis } from '../services/redis';
 
 // Student portal: the teacher adds students to one assignment and gives each a teacher-chosen student ID.
 // The ID alone is NOT a login. The server also makes a random access code per student (shown to the teacher once, only a keyed hash is stored).
@@ -131,7 +133,7 @@ teacherRoster.get('/:aid/:sid', async (req: Request, res: Response) => {
     const { rows } = await getDb().query('SELECT * FROM vedai_submissions WHERE student_row_id=$1', [o.s.id]);
     const b = rows[0];
     const questions = flatQuestions(o.a).map((q, i) => ({ id: q.id, number: i + 1, text: q.text, marks: q.marks, type: q.type, options: q.options || [], answerKey: q.answer || '', rubric: q.rubric || [] }));
-    return res.json({ success: true, data: { student: { id: o.s.id, studentId: o.s.student_code, name: o.s.name || '' }, questions, submitted: !!b, submittedAt: b?.submitted_at || null, late: !!b?.late, answers: b?.answers || {}, marks: b?.marks || {}, released: !!b?.released } });
+    return res.json({ success: true, data: { student: { id: o.s.id, studentId: o.s.student_code, name: o.s.name || '' }, questions, submitted: !!b, submittedAt: b?.submitted_at || null, late: !!b?.late, answers: b?.answers || {}, marks: b?.marks || {}, released: !!b?.released, draft: draftView(b?.draft) } });
   } catch { return res.status(500).json({ success: false, error: 'Failed to load' }); }
 });
 
@@ -161,6 +163,48 @@ teacherRoster.post('/:aid/:sid/release', async (req: Request, res: Response) => 
     return res.json({ success: true, data: { released: rel } });
   } catch { return res.status(500).json({ success: false, error: 'Failed' }); }
 });
+
+function draftView(d: any) {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(d || {}) as [string, any][]) {
+    if (v.state === 'pending' && Date.now() - new Date(v.at).getTime() > 120000) out[k] = { state: 'failed', note: 'The draft took too long. Mark by hand.' };
+    else out[k] = v;
+  }
+  return out;
+}
+// ---- Automatic AI DRAFT for the built-in synthetic demo only ----
+// Sent to Jev ONLY when ALL hold: JEV is on, the paper is the one approved demo paper, the owner is the approved demo account,
+// the question is the 3-level photosynthesis question, and the saved answer is exactly one of the server-fixed SYNTHETIC answers.
+// Anything else is never sent. The draft is for the teacher only; it is never marks, never shown to the student.
+export function draftEligible(a: any, ownerId: string, q: IQuestion, answer: string): { ok: boolean; why?: string } {
+  if (!jevEnabled()) return { ok: false, why: 'AI draft is switched off' };
+  if (ownerId !== process.env.JEV_DEMO_USER_ID || a._id !== process.env.JEV_DEMO_ASSIGNMENT_ID) return { ok: false, why: 'AI draft only runs on the approved demo paper' };
+  if (!q.rubric || q.rubric.length !== 3 || !/photosynthesis/i.test(q.text)) return { ok: false, why: 'This question has no matching built-in demo answer' };
+  if (!Object.values(JEV_FIXTURES).includes(answer)) return { ok: false, why: 'AI draft only works on the built-in synthetic demo answers. This answer was not sent to any AI service.' };
+  return { ok: true };
+}
+async function runDraft(submissionStudentRowId: string, assignmentId: string, ownerId: string, q: IQuestion, answer: string): Promise<void> {
+  const save = async (d: any) => {
+    await getDb().query("UPDATE vedai_submissions SET draft = jsonb_set(draft, ARRAY[$2]::text[], $3::jsonb), updated_at=now() WHERE student_row_id=$1", [submissionStudentRowId, q.id, JSON.stringify(d)]);
+  };
+  try {
+    const a = await Assignment.findById(assignmentId, ownerId);
+    if (!a || !a.output) return await save({ state: 'failed', note: 'Paper not found. Mark by hand.', at: new Date().toISOString() });
+    if ((a.output.gradeCalls || 0) >= JEV_MAX_PER_PAPER) return await save({ state: 'failed', note: 'Demo limit reached for this paper. Mark by hand.', at: new Date().toISOString() });
+    if (!(await takeDailySlot())) return await save({ state: 'failed', note: 'Demo daily limit reached. Mark by hand.', at: new Date().toISOString() });
+    a.output.gradeCalls = (a.output.gradeCalls || 0) + 1;
+    await Assignment.setOutputForOwner(a._id, ownerId, a.output);
+    const asc = [...(q.rubric || [])].sort((x, y) => x.marks - y.marks).map((l) => ({ marks: Math.min(l.marks, q.marks), descriptor: l.descriptor }));
+    let r;
+    try {
+      r = await jevScore({ exam_question: q.text, student_answer: answer }, 'How well does `student_answer` answer `exam_question`? Judge it only against the levels.', asc.map((l) => l.descriptor));
+    } catch { return await save({ state: 'failed', note: 'The grading service did not return a usable answer. Mark by hand.', at: new Date().toISOString() }); }
+    let best = 0; let bp = -1;
+    for (let i = 0; i < asc.length; i++) { const p = Number(r.probabilities[String(i)] ?? 0); if (p > bp) { bp = p; best = i; } }
+    await save({ state: 'done', marks: asc[best].marks, levelIndex: best, guideText: asc[best].descriptor, confidence: r.confidence, model: r.model, at: new Date().toISOString() });
+    await getRedis().del(`assignment:${assignmentId}`);
+  } catch { try { await save({ state: 'failed', note: 'Draft could not be made. Mark by hand.', at: new Date().toISOString() }); } catch { /* ignore */ } }
+}
 
 // ---------------- Student side: /api/student ----------------
 export const studentPortal = Router();
@@ -267,6 +311,13 @@ studentPortal.post('/submit', requireStudent, async (req: Request, res: Response
       'INSERT INTO vedai_submissions (student_row_id, assignment_id, owner_id, answers, late) VALUES ($1,$2,$3,$4::jsonb,$5) ON CONFLICT (student_row_id) DO NOTHING',
       [s.id, s.assignment_id, s.owner_id, JSON.stringify(answers), late]);
     if (!(r.rowCount ?? 0)) return res.status(409).json({ success: false, error: 'You have already submitted. Ask your teacher if you need to change something.' });
+    // automatic AI draft (synthetic demo only). Submission is already saved; the draft runs after and never blocks or changes it.
+    const eligible = flatQuestions(a).filter((q) => answers[q.id] !== undefined && draftEligible(a, s.owner_id, q, answers[q.id]).ok);
+    if (eligible.length) {
+      const q = eligible[0];
+      await getDb().query("UPDATE vedai_submissions SET draft = jsonb_set(draft, ARRAY[$2]::text[], $3::jsonb) WHERE student_row_id=$1", [s.id, q.id, JSON.stringify({ state: 'pending', at: new Date().toISOString() })]);
+      void runDraft(s.id, s.assignment_id, s.owner_id, q, answers[q.id]);
+    }
     return res.status(201).json({ success: true, data: { submitted: true, late } });
   } catch { return res.status(500).json({ success: false, error: 'Could not submit' }); }
 });
