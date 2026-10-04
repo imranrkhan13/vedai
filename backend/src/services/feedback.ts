@@ -12,7 +12,7 @@ export function realAnswerAiGate(s: { id?: string; age_group?: string; ai_consen
   if (g === 'unknown') return { allowed: false, why: 'Age group not set: marked by the teacher only.' };
   if (!s.ai_consent) return { allowed: false, why: 'The student has not agreed to send their answer to an AI service.' };
   // Not a general switch: only the ONE student row id named in REAL_ANSWER_AI_STUDENT can ever pass.
-  if (!s.id || process.env.REAL_ANSWER_AI_STUDENT !== s.id) return { allowed: false, why: 'AI drafting of typed answers is switched off for this student.' };
+  if (!s.id || !(process.env.REAL_ANSWER_AI_STUDENT === s.id || (process.env.SYNTHETIC_AI_STUDENT_IDS || "").split(",").map((x) => x.trim()).filter(Boolean).includes(s.id))) return { allowed: false, why: 'AI drafting of typed answers is switched off for this student.' };
   return { allowed: true, why: 'Adult, agreed, and named as the single pilot student.' };
 }
 
