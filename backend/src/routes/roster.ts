@@ -218,7 +218,7 @@ async function runPilotDraft(student: any, q: IQuestion, answer: string): Promis
     // Reserve the documented per-request maximum BEFORE the call (at most PILOT_MAX_CALLS requests and PILOT_MAX_USD in total); reconciled to real usage afterwards.
     const rsv = await getDb().query('UPDATE vedai_students SET pilot_calls = pilot_calls + 1, pilot_cost_usd = pilot_cost_usd + $2 WHERE id=$1 AND pilot_calls < $3 AND pilot_cost_usd + $2 <= $4 RETURNING pilot_calls', [student.id, PILOT_RESERVE_USD, PILOT_MAX_CALLS, PILOT_MAX_USD]);
     if (!(rsv.rowCount ?? 0)) return await save({ state: 'failed', note: 'Pilot request or spend limit reached. Mark by hand.', at: new Date().toISOString() });
-    if (!(await takeDailySlot())) return await save({ state: 'failed', note: 'Daily limit reached. Mark by hand.', at: new Date().toISOString() });
+    if (!(await takeDailySlot())) { await getDb().query('UPDATE vedai_students SET pilot_calls = GREATEST(0, pilot_calls - 1), pilot_cost_usd = GREATEST(0, pilot_cost_usd - $2) WHERE id=$1', [student.id, PILOT_RESERVE_USD]); return await save({ state: 'failed', note: 'Daily limit reached. Mark by hand.', at: new Date().toISOString() }); }
     let r;
     try { r = await jevScore({ exam_question: q.text, student_answer: answer }, instr, asc.map((l) => l.descriptor), checks); }
     catch { return await save({ state: 'failed', note: 'The grading service did not return a usable answer. Mark by hand.', at: new Date().toISOString() }); }
@@ -231,7 +231,7 @@ async function runPilotDraft(student: any, q: IQuestion, answer: string): Promis
     for (const id of ids) {
       const rs = await getDb().query('UPDATE vedai_students SET pilot_calls = pilot_calls + 1, pilot_cost_usd = pilot_cost_usd + $2 WHERE id=$1 AND pilot_calls < $3 AND pilot_cost_usd + $2 <= $4 RETURNING pilot_calls', [student.id, PILOT_RESERVE_USD, PILOT_MAX_CALLS, PILOT_MAX_USD]);
       if (!(rs.rowCount ?? 0)) break;
-      if (!(await takeDailySlot())) break;
+      if (!(await takeDailySlot())) { await getDb().query('UPDATE vedai_students SET pilot_calls = GREATEST(0, pilot_calls - 1), pilot_cost_usd = GREATEST(0, pilot_cost_usd - $2) WHERE id=$1', [student.id, PILOT_RESERVE_USD]); break; }
       try {
         const c = await jevNoulOne({ exam_question: q.text, student_answer: answer }, kp.checks[id]);
         if (typeof c.usageInputTokens === 'number') await getDb().query('UPDATE vedai_students SET pilot_cost_usd = GREATEST(0, pilot_cost_usd - $2 + $3) WHERE id=$1', [student.id, PILOT_RESERVE_USD, estCostUsd(c.usageInputTokens)]);
