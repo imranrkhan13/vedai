@@ -55,18 +55,19 @@ let usageMode: 'ok' | 'none' | 'huge' = 'ok'; const bodies: any[] = []; const re
   x = await go(P1, 'S3', 'unknown', false, true, ['q1']); ok(bodies.length === 0, 'unknown age: nothing sent');
   x = await go(P1, 'S4', 'adult', false, true, ['q1']); ok(bodies.length === 0, 'adult named but no consent: nothing sent');
   x = await go(P1, 'S5', 'adult', true, true, ['q1']);
-  ok(bodies.length === 1 && bodies[0].state.student_answer === ANS && JSON.stringify(bodies[0]).indexOf('water vapour') < 0, 'consented named adult: exactly one request with his own answer, no answer key text sent');
+  ok(bodies.length === 4 && bodies.every((b) => b.state.student_answer === ANS), 'consented named adult: 1 score + 3 key-point check requests, each with only his own answer');
+  ok(JSON.stringify(bodies[0]).indexOf('water vapour') < 0 && bodies.slice(1).every((b) => Object.keys(b.questions).join(',') === 'k' && b.questions.k.type === 'noul'), 'the score request carries no answer key text; each check is its OWN request with one yes/no question built from the teacher key');
   ok(bodies[0].questions.q.criteria.join('|') === 'LOW-LEVEL|MID-LEVEL|TOP-LEVEL', 'criteria come from this paper\'s own rubric, ascending');
-  ok(Object.keys(bodies[0].questions).join(',') === 'q' && bodies[0].questions.q.type === 'score', 'score-only: ONE Score question per request, no yes/no checks');
-  const d = x.g.draft.q1; ok(d.state === 'done' && d.pilot === true && d.scoreOnly === true && d.marks === 2 && Array.isArray(d.checklist) && d.checklist.length === 0 && d.guideText === 'MID-LEVEL', 'draft stored: level marks and the teacher\'s own guide text, no supporting checks');
+  ok(Object.keys(bodies[0].questions).join(',') === 'q' && bodies[0].questions.q.type === 'score', 'the first request is a Score question alone, no yes/no checks inside it');
+  const d = x.g.draft.q1; ok(d.state === 'done' && d.pilot === true && d.scoreOnly === false && d.marks === 2 && Array.isArray(d.checklist) && d.checklist.length === 3 && d.guideText === 'MID-LEVEL', 'draft stored: level marks, the teacher\'s own guide text and 3 key-point checks');
   ok(Object.keys(x.g.marks).length === 0 && x.g.released === false, 'draft is not marks and is not released');
   const me: any = await fetch(base + '/student/me', { headers: { Cookie: x.ck, 'X-Requested-With': 'quillix' } }).then((r) => r.json()); ok(!JSON.stringify(me).includes('TOP-LEVEL') && !JSON.stringify(me).includes('confidence') && me.data.student.aiPilot === true, 'student never sees draft or guide; pilot flag shown to the student');
-  const cnt: any = (await pg.query("SELECT pilot_calls, pilot_cost_usd FROM vedai_students WHERE id=$1", [x.row])).rows[0]; ok(cnt.pilot_calls === 1 && Math.abs(cnt.pilot_cost_usd - 1200 * 0.042 / 1e6) < 1e-9, 'reservation replaced by the real usage.input_tokens (1200 tokens)');
+  const cnt: any = (await pg.query("SELECT pilot_calls, pilot_cost_usd FROM vedai_students WHERE id=$1", [x.row])).rows[0]; ok(cnt.pilot_calls === 4 && Math.abs(cnt.pilot_cost_usd - 4 * 1200 * 0.042 / 1e6) < 1e-9, 'every reservation replaced by the real usage.input_tokens (4 requests x 1200 tokens)');
   // call cap: 8 questions, only 6 requests ever
   const before = bodies.length; const P8 = await mkPaper(8);
   x = await go(P8, 'S6', 'adult', true, true, ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8']);
   ok(bodies.length - before === 6, 'hard cap: 8 eligible questions, exactly 6 requests');
-  ok(Object.values(x.g.draft).filter((v: any) => v.state === 'done').length === 6 && Object.values(x.g.draft).filter((v: any) => v.state === 'failed').length === 2, '6 drafts done, 2 say limit reached, mark by hand');
+  ok(Object.values(x.g.draft).filter((v: any) => v.state === 'done').length === 2 && Object.values(x.g.draft).filter((v: any) => v.state === 'failed').length === 6, 'q1 uses 4 requests (score + 3 checks), q2 uses the last 2 (score + 1 check); the other 6 questions say limit reached, mark by hand');
   // spend cap: row at 0.00999 -> blocked before any request
   const b2 = bodies.length; const P2 = await mkPaper(1);
   const r = await t('POST', `/roster/${P2}`, { studentId: 'S7', ageGroup: 'adult' }); const row7 = r.body.data.id; await pg.query('UPDATE vedai_students SET pilot_cost_usd=0.00999 WHERE id=$1', [row7]);
@@ -79,7 +80,7 @@ let usageMode: 'ok' | 'none' | 'huge' = 'ok'; const bodies: any[] = []; const re
   // missing usage keeps the full documented reservation; usage above the reservation is recorded and blocks the next request
   { const { PILOT_RESERVE_USD } = await import('../src/services/jev'); ok(Math.abs(PILOT_RESERVE_USD - 0.002688) < 1e-9, 'reservation is the documented 64k tokens at $0.042 per million');
     usageMode = 'none'; const bN = bodies.length; const xN = await go(P1, 'S9', 'adult', true, true, ['q1']); const cN: any = (await pg.query('SELECT pilot_cost_usd FROM vedai_students WHERE id=$1', [xN.row])).rows[0];
-    ok(bodies.length === bN + 1 && Math.abs(cN.pilot_cost_usd - PILOT_RESERVE_USD) < 1e-9, 'missing usage in the response: full reservation stays counted');
+    ok(bodies.length === bN + 3 && Math.abs(cN.pilot_cost_usd - 3 * PILOT_RESERVE_USD) < 1e-9, 'missing usage in the response: every full reservation stays counted, and the 4th request (4 x 0.002688 > 0.01) is refused');
     usageMode = 'huge'; const P3 = await mkPaper(3); const bH = bodies.length; const xH = await go(P3, 'S10', 'adult', true, true, ['q1', 'q2', 'q3']); const cH: any = (await pg.query('SELECT pilot_cost_usd, pilot_calls FROM vedai_students WHERE id=$1', [xH.row])).rows[0];
     ok(bodies.length - bH === 2 && cH.pilot_cost_usd > 0.0083 && cH.pilot_calls === 2, 'usage above the reservation is recorded as real cost, and the 3rd request is refused (real 0.0084 + reserve > 0.01)'); 
     const P4 = await mkPaper(1); const rr = await t('POST', `/roster/${P4}`, { studentId: 'S11', ageGroup: 'adult' }); await pg.query('UPDATE vedai_students SET pilot_cost_usd=0.0075 WHERE id=$1', [rr.body.data.id]); usageMode = 'ok';
