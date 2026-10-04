@@ -41,7 +41,7 @@ export default function StudentsPage() {
   };
   const remove = async (r: Row) => {
     if (!(await confirm(`Remove ${r.studentId} and any submission they made? This cannot be undone.`, 'Remove'))) return;
-    try { await api.rosterRemove(aid, r.id); if (open === r.id) { setOpen(''); setDetail(null); } await load(aid); } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Failed'); }
+    try { await api.rosterRemove(aid, r.id); if (fresh?.studentId === r.studentId) setFresh(null); if (open === r.id) { setOpen(''); setDetail(null); } await load(aid); } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Failed'); }
   };
   const view = async (r: Row) => {
     setOpen(r.id); setDetail(null);
