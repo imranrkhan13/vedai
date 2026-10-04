@@ -38,3 +38,9 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 <!-- deployed on Vercel: set API_PROXY_URL to the backend URL -->
 
 Age group is a group only (under 18, 18 or over, not set), never a date of birth. It changes data permission and feedback wording, not marks.
+
+## Current production frontend
+
+Quesly is the primary frontend alias: https://quesly.vercel.app .
+The older quillix-sigma.vercel.app alias is retained.
+Frontend releases use the main branch; the backend uses neon-postgres.
