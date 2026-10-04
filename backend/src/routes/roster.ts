@@ -341,7 +341,7 @@ studentPortal.get('/me', requireStudent, async (req: Request, res: Response) => 
     const feedback: Record<string, any> = {};
     if (released) for (const q of qs) { const f = feedbackFor(s.age_group, q.marks, (b.marks || {})[q.id]); if (f) feedback[q.id] = f; }
     return res.json({ success: true, data: {
-      student: { studentId: s.student_code, name: s.name || '', ageGroup: s.age_group, aiConsent: !!s.ai_consent, aiPilot: !!s.id && process.env.REAL_ANSWER_AI_STUDENT === s.id },
+      student: { studentId: s.student_code, name: s.name || '', ageGroup: s.age_group, aiConsent: !!s.ai_consent, aiPilot: !!s.id && (process.env.REAL_ANSWER_AI_STUDENT === s.id || (process.env.SYNTHETIC_AI_STUDENT_IDS || "").split(",").map((x) => x.trim()).filter(Boolean).includes(s.id)) },
       assignment: { title: a.title, subject: a.subject, dueDate: a.dueDate, totalMarks: qs.reduce((n, q) => n + q.marks, 0), questions },
       submission: b ? { submitted: true, submittedAt: b.submitted_at, late: !!b.late, answers: b.answers || {}, released, marks: released ? b.marks || {} : null, total: released ? totalMarks(b.marks) : null, feedback: released ? feedback : null } : { submitted: false },
     } });
