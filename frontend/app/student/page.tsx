@@ -43,12 +43,12 @@ export default function StudentPage() {
       <form onSubmit={login} className="card" style={{ width: '100%', maxWidth: 380, padding: 28 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Ques-AI</h1>
         <p style={{ fontSize: 13, color: 'var(--gray-500)', marginBottom: 20 }}>Student sign in. Use the student ID and access code your teacher gave you.</p>
-        <label style={{ fontSize: 12, fontWeight: 600 }}>Student ID</label>
-        <input className="input" required autoComplete="off" value={sid} onChange={e => setSid(e.target.value)} style={{ marginBottom: 12, marginTop: 4 }} />
-        <label style={{ fontSize: 12, fontWeight: 600 }}>Access code</label>
-        <input className="input" required autoComplete="off" value={code} onChange={e => setCode(e.target.value)} placeholder="XXXXX-XXXXX" style={{ marginTop: 4 }} />
+        <label htmlFor="student-id" style={{ fontSize: 12, fontWeight: 600 }}>Student ID</label>
+        <input id="student-id" className="input" required autoComplete="username" value={sid} onChange={e => setSid(e.target.value)} style={{ marginBottom: 12, marginTop: 4 }} />
+        <label htmlFor="student-code" style={{ fontSize: 12, fontWeight: 600 }}>Access code</label>
+        <input id="student-code" className="input" type="password" required autoComplete="current-password" value={code} onChange={e => setCode(e.target.value)} placeholder="XXXXX-XXXXX" style={{ marginTop: 4 }} />
         <button className="btn btn-primary" type="submit" disabled={busy} style={{ width: '100%', marginTop: 18, justifyContent: 'center' }}>{busy ? 'Please wait...' : 'Sign in'}</button>
-        <p style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 14, lineHeight: 1.5 }}>Your answers are saved for your teacher. They are not sent to any AI service, except the built-in made-up demo answers on the demo paper, or if you are the one named adult pilot student and tick the consent box after signing in. Marks are given by your teacher.</p>
+        <p style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 14, lineHeight: 1.5 }}>Your answers are saved and sent to an AI grading service to suggest scores and feedback. Your teacher reviews and shares the final marks.</p>
       </form>
     </div>
   );
@@ -71,14 +71,6 @@ export default function StudentPage() {
           {submitted && sub.marks && <p style={{ fontSize: 13, fontWeight: 600, marginTop: 8 }}>Your teacher marked this: {sub.total} / {a.totalMarks}</p>}
           {submitted && !sub.marks && <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 8 }}>Your teacher has not shared marks yet.</p>}
         </div>
-        {me.student.ageGroup === 'adult' && !submitted && (
-          <div className="card" style={{ padding: '12px 20px', marginBottom: 10 }}>
-            <label style={{ display: 'flex', gap: 8, fontSize: 12, alignItems: 'flex-start', cursor: 'pointer' }}>
-              <input type="checkbox" checked={!!me.student.aiConsent} onChange={async e => { try { await api.studentConsent(e.target.checked); await load(); } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Could not save'); } }} />
-              <span>I agree that my typed answers may be sent to an outside AI service (Typesafe) to draft a grade for my teacher. {me.student.aiPilot ? 'You are the one test student: when you submit, each typed answer (up to 6 requests in total) is sent to Typesafe to draft a grade for your teacher only. Typesafe may keep technical logs and usage data for abuse checks and legal reasons (https://typesafe.ai/legal/mca). Your teacher still decides your marks. Untick before you submit if you do not want this.' : 'This only records your choice. Right now no typed answers are sent, and your teacher still decides your marks. You can change this any time.'}</span>
-            </label>
-          </div>
-        )}
         {qs.map(q => (
           <div key={q.id} className="card" style={{ padding: '14px 20px', marginBottom: 10 }}>
             <p style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.6 }}>{q.number}. {q.text} <span style={{ color: 'var(--gray-500)', fontWeight: 500 }}>[{q.marks} mark{q.marks > 1 ? 's' : ''}]</span></p>
@@ -103,7 +95,7 @@ export default function StudentPage() {
         {!submitted && (
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 14 }}>
             <button className="btn btn-primary" onClick={submit} disabled={busy}>{busy ? 'Submitting...' : 'Submit answers'}</button>
-            <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>Typed answers only. You can submit once. {me.student.aiPilot && me.student.aiConsent ? 'Your answers go to your teacher and, because you ticked the box above, to Typesafe for a teacher-only draft grade.' : 'Your answers go to your teacher, not to an AI service (except the built-in made-up demo answers on the one demo paper).'}</span>
+            <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>Typed answers only. You can submit once. AI suggests scores for teacher review. Your teacher decides when to share final marks.</span>
           </div>
         )}
       </div>

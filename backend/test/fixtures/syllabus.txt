@@ -1,0 +1,4 @@
+Synthetic Science Syllabus
+Photosynthesis uses carbon dioxide, water and sunlight to make glucose and oxygen. Chlorophyll absorbs light in chloroplasts.
+Newton first law describes inertia. Newton second law states F=ma. Force is measured in newtons, mass in kilograms and acceleration in metres per second squared. Newton third law states equal and opposite forces act on different objects.
+A circuit needs a complete path for current. A battery supplies potential difference. Wires conduct current. A switch opens and closes the loop. A lamp converts electrical energy into light and heat. Series circuits have one path and parallel circuits have multiple paths.

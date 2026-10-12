@@ -66,7 +66,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
     api.wsTicket().then((t) => connect(t.ticket)).catch(() => {}).finally(() => { wsPending = false; });
 
     function connect(ticket: string) {
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:5000/ws';
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:4000/ws';
     const clientId = `client_${Math.random().toString(36).slice(2)}`;
 
     let ws: WebSocket;

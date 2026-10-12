@@ -11,7 +11,8 @@
     "start:dev": "ts-node src/index.ts",
     "worker": "node dist/worker.js",
     "worker:dev": "ts-node src/worker.ts",
-    "test": "ts-node test/model.test.ts && ts-node test/api.test.ts"
+    "test": "ts-node test/model.test.ts && ts-node test/api.test.ts && ts-node test/classroom.test.ts && ts-node test/grading.test.ts",
+    "test:live": "ts-node test/live.test.ts"
   },
   "dependencies": {
     "bullmq": "^5.0.0",

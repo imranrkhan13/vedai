@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { Assignment } from '../models/Assignment';
 import { getAssignmentQueue } from '../services/queue';
 import { getRedis } from '../services/redis';
+import { getDb } from '../services/db';
 import { requireAuth } from '../services/auth';
 
 const router = Router();
@@ -18,7 +19,7 @@ const CreateAssignmentSchema = z.object({
   totalMarks: z.number().min(1).max(500),
   difficulty: z.enum(['easy', 'medium', 'hard', 'mixed']).default('mixed'),
   additionalInstructions: z.string().optional(),
-  fileContent: z.string().optional(),
+  fileContent: z.string().max(100000).optional(),
   clientId: z.string().optional(),
 });
 
@@ -89,6 +90,8 @@ router.post('/:id/regenerate', async (req: Request, res: Response) => {
     const assignment = await Assignment.findById(req.params.id as string, req.userId!);
     if (!assignment) return res.status(404).json({ success: false, error: 'Not found' });
 
+    const enrolled = await getDb().query('SELECT id FROM vedai_students WHERE assignment_id=$1 LIMIT 1', [assignment._id]);
+    if (enrolled.rows.length) return res.status(409).json({ success: false, error: 'This paper has assigned students. Create a new paper to preserve their submissions.' });
     await Assignment.resetForRegenerate(assignment._id);
 
     const redis = getRedis();
@@ -115,4 +118,15 @@ router.delete('/:id', async (req: Request, res: Response) => {
   }
 });
 
+router.patch('/:id/rubric', async (req, res) => {
+  const a = await Assignment.findById(String(req.params.id), req.userId!);
+  if (!a?.output) return res.status(404).json({ success: false, error: 'Paper not found' });
+  const p = z.object({ questionId: z.string(), levels: z.array(z.object({ marks: z.number().int().nonnegative(), descriptor: z.string().min(1).max(2000), example: z.string().max(5000) })).length(3) }).safeParse(req.body);
+  const q = p.success && a.output.sections.flatMap(s => s.questions).find(q => q.id === p.data.questionId);
+  if (!p.success || !q || p.data.levels.some(l => l.marks > q.marks)) return res.status(400).json({ success: false, error: 'Invalid marking guide' });
+  Object.assign(q, { rubric: p.data.levels, rubricEdited: true });
+  await Assignment.setCompleted(a._id, a.output);
+  await getRedis().del(`assignment:${a._id}`);
+  return res.json({ success: true });
+});
 export default router;

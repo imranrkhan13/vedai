@@ -31,10 +31,10 @@ export default function LoginPage() {
         <p style={{ fontSize: 13, color: 'var(--gray-500)', marginBottom: 20 }}>
           {mode === 'login' ? 'Sign in to see your assignments.' : 'Create a free teacher account. Your papers stay private to you.'}
         </p>
-        <label style={{ fontSize: 12, fontWeight: 600 }}>Email</label>
-        <input className="input" type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} style={{ marginBottom: 12, marginTop: 4 }} />
-        <label style={{ fontSize: 12, fontWeight: 600 }}>Password</label>
-        <input className="input" type="password" required minLength={8} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e => setPassword(e.target.value)} style={{ marginTop: 4 }} />
+        <label htmlFor="teacher-email" style={{ fontSize: 12, fontWeight: 600 }}>Email</label>
+        <input id="teacher-email" className="input" type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} style={{ marginBottom: 12, marginTop: 4 }} />
+        <label htmlFor="teacher-password" style={{ fontSize: 12, fontWeight: 600 }}>Password</label>
+        <input id="teacher-password" className="input" type="password" required minLength={8} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e => setPassword(e.target.value)} style={{ marginTop: 4 }} />
         {mode === 'register' && <p style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 4 }}>At least 8 characters.</p>}
         <button className="btn btn-primary" type="submit" disabled={busy} style={{ width: '100%', marginTop: 18, justifyContent: 'center' }}>
           {busy ? 'Please wait...' : mode === 'login' ? 'Sign in' : 'Create account'}

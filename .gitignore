@@ -4,4 +4,4 @@ dist/
 .env
 .env.local
 *.log
-backend/.env.example
+backend/test/live-result.json

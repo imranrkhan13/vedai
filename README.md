@@ -1,187 +1,43 @@
-# VedaAI – AI Assessment Creator
-### Full Stack Engineering Assignment Submission
+# Ques-AI
 
----
+A teacher assessment workspace with syllabus uploads, question generation, teacher-assigned student access, typed submissions, and Jev grading drafts with explanations.
 
-## 📁 Project Structure
+## Run locally
 
-```
-vedaai/
-├── README.md                          ← You are here
-├── docker-compose.yml                 ← Spins up Postgres + Redis locally
-│
-├── backend/                           ← Node.js + Express + TypeScript API
-│   ├── src/
-│   │   ├── index.ts                   ← Entry point: Express server + WebSocket init
-│   │   ├── worker.ts                  ← BullMQ worker (run as SEPARATE process)
-│   │   │
-│   │   ├── models/
-│   │   │   └── Assignment.ts          ← Postgres model + queries (assignments table, JSONB output)
-│   │   │
-│   │   ├── routes/
-│   │   │   ├── assignments.ts         ← REST CRUD: GET/POST/DELETE + /regenerate
-│   │   │   └── jobs.ts                ← GET /api/jobs/:jobId → BullMQ job state
-│   │   │
-│   │   └── services/
-│   │       ├── aiGenerator.ts         ← AI fallback chain (Gemini→OpenRouter→Mistral→Cohere→Groq)
-│   │       ├── db.ts                  ← Postgres connection (pg, Neon-compatible)
-│   │       ├── queue.ts               ← BullMQ Queue factory
-│   │       ├── redis.ts               ← ioredis singleton
-│   │       └── websocket.ts           ← WS server: per-client channels, notifyClient()
-│   │
-│   ├── .env                           ← ⚠️  Pre-filled with all API keys (ready to run)
-│   └── tsconfig.json
-│
-└── frontend/                          ← Next.js 14 App Router + TypeScript
-    ├── app/
-    │   ├── layout.tsx                 ← Root layout, Inter font, React Hot Toast
-    │   ├── page.tsx                   ← Redirects / → /assignments
-    │   ├── assignments/page.tsx       ← Dashboard: card grid, search, status badges
-    │   ├── create/page.tsx            ← Multi-step form: validation, file upload, type picker
-    │   └── output/[id]/page.tsx       ← Question paper: progress steps, stats, PDF export
-    │
-    ├── components/
-    │   └── layout/Sidebar.tsx         ← Left nav: logo, create button, nav items, user profile
-    │
-    ├── store/
-    │   └── assignmentStore.ts         ← Zustand store: assignments state + WebSocket client
-    │
-    ├── lib/
-    │   └── api.ts                     ← Typed fetch wrapper for all backend endpoints
-    │
-    └── types/
-        └── index.ts                   ← Shared TypeScript interfaces (Assignment, Section, Question…)
-```
+Requires Node 20+, PostgreSQL and Redis.
 
----
+1. Run `docker compose up -d` to start PostgreSQL and Redis.
+2. Install dependencies with `npm ci` in `backend` and `frontend`.
+3. Copy `backend/.env.example` to `backend/.env` and configure server credentials. No API keys are included in this repository.
+4. Run `npm run build` then `npm start` in `backend` (port 4000).
+5. In another backend terminal, run `npm run worker`. Alternatively set `WORKER_IN_WEB=true` to run the worker in the API process.
+6. Run `npm run dev` in `frontend`, then open http://localhost:3000.
 
-## 🚀 How to Run (5 minutes)
+The frontend proxies `/api` to `http://localhost:4000`. Set `API_PROXY_URL` if the backend is elsewhere. Configure `NEXT_PUBLIC_WS_URL` for a remote WebSocket server.
 
-### Step 1 – Start Postgres + Redis
-```bash
-docker-compose up -d
-```
+## Classroom workflow
 
-### Step 2 – Backend API Server
-```bash
-cd backend
-npm install
-export DATABASE_URL=postgres://postgres:postgres@localhost:5432/vedaai
-npm start          # runs ts-node src/index.ts on :5000
-```
+- Teachers register or sign in, upload a text syllabus/PDF/printed image, and select question types, difficulty and marks. The full extracted text is sent to the question provider, with a 100,000-character limit. PDF and image readers load from jsDelivr in the browser; scanned PDFs require conversion to an image or text first.
+- Generation runs in BullMQ. Questions have answer keys and weighted marking points; supported generated marking guides can be edited by the teacher.
+- Open **Students** from a completed paper. Assign a unique student ID and give the student the private access code displayed once. IDs currently identify a single paper, so use a distinct ID for each paper assignment.
+- Students sign in at `/student`, write typed answers and submit once. Submission is saved before a grading job is queued.
+- The worker sends the question, reference answer and typed student answer to TypeSafe's Jev model. It checks each marking point using the Noul API. A probability of at least 0.8 awards that point's weight; at most 0.2 labels it missing; intermediate values withhold credit and flag teacher review. The score is the sum of awarded weights, always bounded by the question's maximum.
+- The teacher sees numeric scores, each point's credit/deduction and the explanation of the formula. Explanations are assembled by the app from Jev's checks, not generated prose or private model reasoning. Older papers without marking points use their complete answer key as one point.
+- Teachers can use the draft, adjust marks and comments, and save each question. Results stay hidden until every question is marked and the teacher releases results.
+- If Jev or the queue is unavailable, submissions stay saved. The teacher sees the failure and can retry or mark manually. Grading jobs use BullMQ retries; repeated retries while a job is active are deduplicated.
+- Resetting an access code invalidates student sessions. Regeneration is blocked once students are assigned, preserving the paper they answered.
 
-### Step 3 – Background Worker (new terminal)
-```bash
-cd backend
-npm run worker     # BullMQ worker picks jobs from Redis queue
-```
+## Configuration
 
-### Step 4 – Frontend
-```bash
-cd frontend
-npm install
-npm run dev        # Next.js on :3000
-```
+`TYPESAFE_API_KEY` enables Jev grading; `TYPESAFE_MODEL` defaults to `jev-latest`. Question generation uses the existing Groq/Gemini/OpenRouter/Mistral/Cohere fallback chain. At least one generation key is needed. Keep keys server-side.
 
-Open **http://localhost:3000**
+`AUTH_SECRET` should be a long random secret. Teacher and student sessions use signed httpOnly cookies. Teachers only access their own papers and rosters; student responses never include answer keys or unreleased marks. Student login is rate limited.
 
-> **No API key needed** — the `.env` is pre-filled with all keys.
+## Verification
 
----
+- Backend: `npm run build` and `npm test`.
+- Frontend: `npm run build` and `npm run lint`.
 
-## ⚙️ How It Works (Request Flow)
+Backend tests cover persistence, generation jobs, owner isolation, authentication cookies, student assignment/login, submission validation, duplicate submission protection, grading explanations, invalid/uncertain Jev responses, result release and access-code reset. They use in-memory PostgreSQL (PGlite), queue/Redis stubs and simulated AI responses: passing them does not verify live provider quality, Redis delivery or production hosting.
 
-```
-Teacher fills form
-       ↓
-POST /api/assignments          → Postgres row created (status: pending)
-       ↓
-BullMQ job enqueued            → jobId returned to frontend
-       ↓
-Frontend → /output/:id         → subscribes via WebSocket
-       ↓
-Worker picks job               → status: processing
-       ↓
-aiGenerator.ts tries providers:
-  1. Gemini 1.5 Flash
-  2. OpenRouter (Llama 3.1 free)
-  3. Mistral small
-  4. Cohere command-r-plus
-  5. Groq llama-3.1-8b
-       ↓
-JSON parsed + validated        → stored in Postgres
-       ↓
-WebSocket notifies frontend    → status: completed
-       ↓
-Redis caches result (10 min)   → fast subsequent loads
-       ↓
-Question paper rendered        ← structured sections, difficulty badges, marks
-```
-
----
-
-## 🔌 API Reference
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/assignments` | All assignments (last 50, no output/file) |
-| `POST` | `/api/assignments` | Create assignment + enqueue AI generation |
-| `GET` | `/api/assignments/:id` | Single assignment (Redis cached if complete) |
-| `POST` | `/api/assignments/:id/regenerate` | Re-run generation job |
-| `DELETE` | `/api/assignments/:id` | Delete + invalidate cache |
-| `GET` | `/api/jobs/:jobId` | BullMQ job state + progress |
-| `WS` | `/ws?clientId=xxx` | Real-time progress events |
-
-### WebSocket Events
-```json
-{ "type": "connected",     "clientId": "xxx" }
-{ "type": "job:progress",  "assignmentId": "...", "progress": 50, "message": "Writing questions..." }
-{ "type": "job:completed", "assignmentId": "..." }
-{ "type": "job:failed",    "assignmentId": "...", "message": "All AI providers failed" }
-```
-
----
-
-## ✅ Features Implemented
-
-### Core (Required)
-- [x] Assignment creation form with full validation
-- [x] File upload (PDF/TXT) fed into AI prompt
-- [x] Zustand state management + WebSocket
-- [x] AI question generation (structured prompt → JSON schema → parse → store)
-- [x] Sections (A/B/C), difficulty distribution, marks per question
-- [x] Postgres (Neon) for assignments + results
-- [x] Redis for caching completed assignments
-- [x] BullMQ for background jobs
-- [x] WebSocket real-time progress updates
-- [x] Structured output: sections, questions, difficulty tags, marks
-
-### Bonus (Extra)
-- [x] **PDF export** — html2pdf.js (formatted A4, not raw HTML print)
-- [x] **Copy to clipboard** — plain-text version of question paper
-- [x] **Regenerate button** — re-queues job, invalidates cache
-- [x] **Multi-provider AI fallback** — 5 providers, automatic failover
-- [x] **Progress step indicator** — 4-stage visual progress track
-- [x] **Stats dashboard** — marks/sections/questions/duration tiles
-- [x] **Difficulty stats** in paper footer (X Easy, Y Medium, Z Hard)
-- [x] **Search + filter** on assignments page
-- [x] **Loading skeletons** for better perceived performance
-- [x] **Figma-faithful UI** — white sidebar, card grid, orange accent, topbar
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Choice | Why |
-|-------|--------|-----|
-| Frontend | Next.js 14 App Router + TypeScript | SSR, file-based routing, React Server Components |
-| State | Zustand | Lightweight, no boilerplate, WebSocket integration easy |
-| Backend | Express + TypeScript | Familiar, minimal overhead |
-| Database | Postgres (Neon) + pg | JSONB for nested output |
-| Cache | Redis + ioredis | Fast completed-assignment lookups |
-| Queue | BullMQ | Built on Redis, retry logic, job state tracking |
-| Realtime | ws (WebSocket) | Per-client channels, lightweight |
-| AI | Multi-provider fallback | No single point of failure, free tiers |
-| PDF | html2pdf.js | Client-side, no server dependency |
-
-<!-- deploy trigger 1790950676 -->
+The frontend currently has existing lint failures in several older components (untyped `any` and React effect rules). Production compilation and TypeScript checks are separate from lint.

@@ -13,7 +13,7 @@ Total Marks: ${a.totalMarks}
 Question Types: ${a.questionTypes.join(', ')}
 ${a.questionPlan ? `Exact plan (follow it exactly):\n${a.questionPlan.map((r) => `  - ${r.qty} question(s) of type "${r.type}", each worth exactly ${r.marks} mark(s)`).join('\n')}\n` : ''}Difficulty: ${a.difficulty === 'mixed' ? 'Mix — 30% easy, 50% medium, 20% hard' : a.difficulty}
 ${a.additionalInstructions ? `Special Instructions: ${a.additionalInstructions}` : ''}
-${a.fileContent ? `Reference Content (use this to frame questions):\n${a.fileContent.slice(0, 2000)}` : ''}
+${a.fileContent ? `Reference Content (use this to frame questions):\n${a.fileContent}` : ''}
 
 RULES:
 - Return ONLY a JSON object, no markdown fences, no explanation
@@ -21,6 +21,8 @@ RULES:
 - Total questions across ALL sections must equal exactly ${a.numberOfQuestions}
 - Questions must be specific, academically rigorous, and about ${a.subject}
 - Each question must have: text, difficulty (easy|medium|hard), marks (number), type (string), concept (2-4 words naming the single fact or skill it tests; every question needs a different concept), answer (the correct answer or a short model answer)
+- Every question must include "markingPoints": an array of independent assessable facts/steps {"text": "specific expected fact", "marks": integer}. Their marks must sum exactly to the question marks. Use these to explain credit and deductions.
+- Questions worth 3 or more marks should include "rubric": three {"marks": integer, "descriptor": "concrete assessment level", "example": "sample answer"} entries.
 - Every MCQ question MUST also have an "options" array of exactly 4 distinct answer choices (plain text, no A/B/C/D prefixes), and its "answer" must be exactly one of those options
 - Every question must test a different fact or skill; never ask about the same fact twice, even in different words
 - Use ONLY these question types, and use each at least once: ${a.questionTypes.join(', ')}. Set each question's "type" to the matching label (MCQ, Short, Long, Diagram, Numerical, True/False, Fill, Essay)
@@ -52,7 +54,7 @@ async function tryGemini(prompt: string): Promise<string> {
   const key = process.env.GEMINI_API_KEY;
   if (!key || key.includes('your_')) throw new Error('No Gemini key');
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL || 'gemini-1.5-flash'}:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL || 'gemini-flash-latest'}:generateContent?key=${key}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4, maxOutputTokens: 4096 } }) }
   );
@@ -69,7 +71,7 @@ export function resolveOpenRouterModel(env: NodeJS.ProcessEnv = process.env): st
 }
 
 export function resolveOpenRouterModels(env: NodeJS.ProcessEnv = process.env): string[] {
-  const list = (env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free').split(',').map((m) => m.trim()).filter(Boolean).slice(0, 3);
+  const list = (env.OPENROUTER_MODEL || 'apodex/apodex-1.1-mini:free').split(',').map((m) => m.trim()).filter(Boolean).slice(0, 3);
   for (const m of list) if (!m.endsWith(':free')) throw new Error('OpenRouter model is not a :free model; blocked');
   return list;
 }
@@ -108,12 +110,12 @@ async function tryOpenRouter(prompt: string): Promise<string> {
 }
 
 async function tryGroq(prompt: string): Promise<string> {
-  const key = process.env.GROK_API_KEY;
+  const key = process.env.GROQ_API_KEY || process.env.GROK_API_KEY;
   if (!key || key.includes('your_')) throw new Error('No Groq key');
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-    body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], max_tokens: 4096, temperature: 0.4 }),
+    body: JSON.stringify({ model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b', messages: [{ role: 'user', content: prompt }], max_tokens: 4096, temperature: 0.4 }),
   });
   if (!res.ok) throw new Error(`Groq ${res.status}`);
   const data = await res.json() as any;
@@ -143,7 +145,7 @@ async function tryCohere(prompt: string): Promise<string> {
   const res = await fetch('https://api.cohere.com/v2/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-    body: JSON.stringify({ model: 'command-r-plus', messages: [{ role: 'user', content: prompt }], max_tokens: 4096, temperature: 0.4 }),
+    body: JSON.stringify({ model: process.env.COHERE_MODEL || 'command-r-plus-08-2024', messages: [{ role: 'user', content: prompt }], max_tokens: 4096, temperature: 0.4 }),
   });
   if (!res.ok) throw new Error(`Cohere ${res.status}`);
   const data = await res.json() as any;
@@ -260,6 +262,15 @@ export function parseResponse(raw: string, a: IAssignment): IGeneratedOutput {
       if (Array.isArray(q.options)) out.options = q.options.map((o: any) => stripNul(String(o)).trim()).filter(Boolean);
       if (q.answer !== undefined && q.answer !== null && String(q.answer).trim()) out.answer = stripNul(String(q.answer)).trim();
       if (canonicalType(type) === 'mcq' && (!out.options || out.options.length < 2)) throw new Error('Model returned an MCQ without answer choices');
+      if (Array.isArray(q.markingPoints) && q.markingPoints.length > 0 && q.markingPoints.length <= 20) {
+        const points = q.markingPoints.map((p: any) => ({ text: stripNul(String(p.text || '')).trim(), marks: Number(p.marks) }));
+        if (points.some((p: any) => !p.text || !Number.isInteger(p.marks) || p.marks < 1) || points.reduce((n: number,p: any) => n+p.marks,0) !== out.marks) throw new Error('Invalid marking-point allocation');
+        out.markingPoints = points;
+      }
+      if (Array.isArray(q.rubric) && q.rubric.length === 3) {
+        const levels = q.rubric.map((l: any) => ({ marks: Number(l.marks), descriptor: stripNul(String(l.descriptor || '')), example: stripNul(String(l.example || '')) }));
+        if (levels.every((l: any) => Number.isInteger(l.marks) && l.marks >= 0 && l.marks <= out.marks && l.descriptor)) out.rubric = levels;
+      }
       return out;
     });
     return { title: sec.title || 'Section', instruction: sec.instruction || 'Attempt all questions.', questions, totalMarks: questions.reduce((s, q) => s + q.marks, 0) };

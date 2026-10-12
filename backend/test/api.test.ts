@@ -5,7 +5,8 @@ import path from 'node:path';
 import express from 'express';
 import type { AddressInfo } from 'node:net';
 
-for (const k of ['GEMINI_API_KEY','OPENROUTER_API_KEY','MISTRAL_API_KEY','COHERE_API_KEY','GROK_API_KEY']) delete process.env[k];
+process.env.NODE_ENV = 'test';
+for (const k of ['GROQ_API_KEY', 'GEMINI_API_KEY','OPENROUTER_API_KEY','MISTRAL_API_KEY','COHERE_API_KEY','GROK_API_KEY']) delete process.env[k];
 
 const src = (f: string) => path.resolve(__dirname, '../src', f);
 const stub = (f: string, exports: any) => { require.cache[require.resolve(src(f))] = { id: src(f), filename: src(f), loaded: true, exports } as any; };
@@ -21,7 +22,7 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
   const pg = new PGlite(); await pg.exec(SCHEMA_SQL);
   setDb({ query: async (t, p) => { const r = await pg.query(t, p as any[]); return { rows: r.rows as any[], rowCount: r.affectedRows ?? r.rows.length }; } });
   const router = (await import('../src/routes/assignments')).default;
-  const { processAssignmentJob, shouldRunWorkerInWeb } = await import('../src/worker');
+  const { processAssignmentJob, shouldRunWorkerInWeb, handleAssignmentFailure } = await import('../src/worker');
 
   const app = express(); app.use(express.json()); app.use('/api/assignments', router);
   const srv = app.listen(0); const base = `http://127.0.0.1:${(srv.address() as AddressInfo).port}/api/assignments`;
@@ -45,6 +46,12 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
   // honest failure when no provider works (default)
   await processAssignmentJob({ id: '0', data: jobs[0].data, updateProgress: async () => {} } as any).then(() => assert.fail('should throw'), (e) => { ok(/AI providers/.test(e.message), 'no-provider run throws'); });
   process.env.ALLOW_MOCK_OUTPUT = 'true';
+  await handleAssignmentFailure({ data: jobs[0].data, opts: { attempts: 3 }, attemptsMade: 1 } as any, new Error('Temporary validation rejection'));
+  r = await j('/' + id);
+  ok(r.body.data.status === 'processing' && !notices.some(([, p]) => p.type === 'job:failed'), 'retry keeps processing without terminal failure notice');
+  await handleAssignmentFailure({ data: jobs[0].data, opts: { attempts: 3 }, attemptsMade: 3 } as any, new Error('Retries exhausted'));
+  r = await j('/' + id);
+  ok(r.body.data.status === 'failed' && notices.some(([, p]) => p.type === 'job:failed'), 'exhausted retries persist failure and notify client');
   await processAssignmentJob({ id: '1', data: jobs[0].data, updateProgress: async () => {} } as any); // worker persistence, mock paper (no keys)
   ok(notices.some(([c, p]) => c === 'c1' && p.type === 'job:completed'), 'worker notified completion');
   r = await j('/' + id);

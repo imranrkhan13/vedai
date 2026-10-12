@@ -28,6 +28,10 @@ services:
         sync: false
       - key: GROK_API_KEY
         sync: false
+      - key: TYPESAFE_API_KEY
+        sync: false
+      - key: AUTH_SECRET
+        sync: false
 
   # Background worker
   - type: worker
@@ -53,4 +57,6 @@ services:
       - key: COHERE_API_KEY
         sync: false
       - key: GROK_API_KEY
+        sync: false
+      - key: TYPESAFE_API_KEY
         sync: false

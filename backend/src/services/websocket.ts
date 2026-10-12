@@ -3,6 +3,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { getRedis } from './redis';
 import Redis from 'ioredis';
+import { verifyToken } from './auth';
 
 const clients = new Map<string, WebSocket>();
 
@@ -11,6 +12,8 @@ export function initWebSocket(server: Server) {
 
   wss.on('connection', (ws, req) => {
     const url = new URL(req.url || '', 'http://localhost');
+    const uid = verifyToken(url.searchParams.get('ticket') || '');
+    if (!uid || uid.startsWith('student:')) { ws.close(1008, 'Sign in required'); return; }
     const clientId = url.searchParams.get('clientId') || Math.random().toString(36).slice(2);
     clients.set(clientId, ws);
     console.log(`WS connected: ${clientId} (total: ${clients.size})`);

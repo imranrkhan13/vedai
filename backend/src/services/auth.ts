@@ -47,8 +47,14 @@ declare module 'express-serve-static-core' { interface Request { userId?: string
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const h = req.headers.authorization || '';
-  const uid = h.startsWith('Bearer ') ? verifyToken(h.slice(7)) : null;
-  if (!uid) return res.status(401).json({ success: false, error: 'Please sign in' });
+  const uid = h.startsWith('Bearer ') ? verifyToken(h.slice(7)) : verifyToken(readCookie(req, 'vedai_session'));
+  if (!uid || uid.startsWith('student:')) return res.status(401).json({ success: false, error: 'Please sign in' });
   req.userId = uid;
   next();
 }
+
+export function readCookie(req: Request, name: string): string {
+  const value = (req.headers.cookie || '').split(';').map(s => s.trim()).find(s => s.startsWith(name + '='));
+  return value ? value.slice(name.length + 1) : '';
+}
+export const cookieOptions = { httpOnly: true, sameSite: 'lax' as const, secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 7 * 24 * 3600 * 1000 };

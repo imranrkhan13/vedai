@@ -35,7 +35,7 @@ html { scroll-behavior: smooth; }
 body {
   background: var(--bg);
   color: var(--black);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   line-height: 1.5;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -84,7 +84,7 @@ body {
 /* ── Buttons ─────────────────────────────────── */
 .btn {
   display: inline-flex; align-items: center; justify-content: center;
-  gap: 6px; padding: 9px 20px; border-radius: 9px; font-family: 'Inter',sans-serif;
+  gap: 6px; padding: 9px 20px; border-radius: 9px; font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   font-size: 13px; font-weight: 600; cursor: pointer; border: none;
   transition: all 0.18s cubic-bezier(0.22,1,0.36,1);
   position: relative; overflow: hidden; user-select: none; white-space: nowrap;
@@ -136,7 +136,7 @@ body {
 .input {
   width: 100%; padding: 9px 12px; background: var(--white);
   border: 1.5px solid var(--gray-200); border-radius: 9px;
-  color: var(--black); font-size: 13px; font-family: 'Inter',sans-serif;
+  color: var(--black); font-size: 13px; font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   outline: none; transition: border-color 0.15s, box-shadow 0.15s;
 }
 .input:focus { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(249,115,22,0.1); }
@@ -232,3 +232,6 @@ input[type="number"] { -moz-appearance: textfield; }
   .main-content [style*="48px"] { padding-left: 16px !important; padding-right: 16px !important; }
   .main-content [style*="48px"] input { width: auto !important; flex: 1; min-width: 0; }
 }
+
+button, input, textarea, select { font-family: inherit; }
+:focus-visible { outline: 3px solid #fb923c; outline-offset: 3px; }

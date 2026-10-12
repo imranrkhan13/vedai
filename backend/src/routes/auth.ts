@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { getDb } from '../services/db';
-import { hashPassword, verifyPassword, signToken, requireAuth } from '../services/auth';
+import { hashPassword, verifyPassword, signToken, requireAuth, cookieOptions } from '../services/auth';
 
 const router = Router();
 const Creds = z.object({ email: z.string().trim().toLowerCase().email().max(200), password: z.string().min(8).max(200) });
@@ -28,6 +28,7 @@ router.post('/register', async (req: Request, res: Response) => {
       [p.data.email, hashPassword(p.data.password)]
     );
     if (!rows[0]) return res.status(409).json({ success: false, error: 'That email is already registered' });
+    res.cookie('vedai_session', signToken(rows[0].id), cookieOptions);
     return res.status(201).json({ success: true, data: { token: signToken(rows[0].id), user: { id: rows[0].id, email: rows[0].email } } });
   } catch { return res.status(500).json({ success: false, error: 'Could not register' }); }
 });
@@ -40,6 +41,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const { rows } = await getDb().query('SELECT id, email, password_hash FROM vedai_users WHERE email=$1', [p.data.email]);
     const u = rows[0];
     if (!u || !verifyPassword(p.data.password, u.password_hash)) return res.status(401).json({ success: false, error: 'Wrong email or password' });
+    res.cookie('vedai_session', signToken(u.id), cookieOptions);
     return res.json({ success: true, data: { token: signToken(u.id), user: { id: u.id, email: u.email } } });
   } catch { return res.status(500).json({ success: false, error: 'Could not sign in' }); }
 });
@@ -50,4 +52,6 @@ router.get('/me', requireAuth, async (req: Request, res: Response) => {
   return res.json({ success: true, data: rows[0] });
 });
 
+router.post('/logout', (_req, res) => { res.clearCookie('vedai_session', { path: '/' }); res.json({ success: true }); });
+router.post('/ws-ticket', requireAuth, (req, res) => res.json({ success: true, data: { ticket: signToken(req.userId!, 60) } }));
 export default router;

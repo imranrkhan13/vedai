@@ -246,7 +246,7 @@ export default function CreatePage() {
                   <X size={14}/>
                 </button>
               </div>
-                <p style={{ fontSize:11, color:'var(--gray-500)', margin:'-8px 0 14px', lineHeight:1.5 }}>{fileContent.length.toLocaleString()} characters read.{fileContent.length>2000?' Only the first 2,000 characters are used to make questions; the rest is ignored. Split longer notes into parts.':''} Images are read in your browser and not uploaded. The text is sent to our server and to free AI models when you generate, so do not use private student content.</p>
+                <p style={{ fontSize:11, color:'var(--gray-500)', margin:'-8px 0 14px', lineHeight:1.5 }}>{fileContent.length.toLocaleString()} characters read. Full extracted text is used (up to 100,000 characters). Images are read in your browser and not uploaded. The text is sent to our server and to free AI models when you generate, so do not use private student content.</p>
               </>
             )}
 

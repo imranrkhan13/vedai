@@ -58,6 +58,7 @@ export const api = {
   rosterReset: (aid: string, sid: string) => fetchAPI<{ accessCode: string }>(`/roster/${aid}/${sid}/reset`, { method: 'POST', body: '{}' }),
   rosterRemove: (aid: string, sid: string) => fetchAPI(`/roster/${aid}/${sid}`, { method: 'DELETE' }),
   rosterSubmission: (aid: string, sid: string) => fetchAPI<any>(`/roster/${aid}/${sid}`),
+  rosterGrade: (aid: string, sid: string) => fetchAPI(`/roster/${aid}/${sid}/grade`, { method: 'POST', body: '{}' }),
   rosterMark: (aid: string, sid: string, questionId: string, marks: number, reason: string) => fetchAPI<{ total: number }>(`/roster/${aid}/${sid}/marks`, { method: 'PATCH', body: JSON.stringify({ questionId, marks, reason }) }),
   rosterRelease: (aid: string, sid: string, released: boolean) => fetchAPI(`/roster/${aid}/${sid}/release`, { method: 'POST', body: JSON.stringify({ released }) }),
   studentLogin: (studentId: string, accessCode: string) => fetchAPI<{ student: { studentId: string; name: string } }>('/student/login', { method: 'POST', body: JSON.stringify({ studentId, accessCode }) }),
