@@ -2,7 +2,6 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { Assignment } from '../models/Assignment';
 import { getAssignmentQueue } from '../services/queue';
-import { getRedis } from '../services/redis';
 import { getDb } from '../services/db';
 import { requireAuth } from '../services/auth';
 
@@ -34,19 +33,8 @@ router.get('/', async (req: Request, res: Response) => {
 
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    // Ownership check first: the cache is keyed by id only.
-    const own = await Assignment.findById(req.params.id as string, req.userId!);
-    if (!own) return res.status(404).json({ success: false, error: 'Not found' });
-    const redis = getRedis();
-    const cached = await redis.get(`assignment:${req.params.id}`);
-    if (cached) return res.json({ success: true, data: JSON.parse(cached), cached: true });
-
-    const assignment = await Assignment.findById(req.params.id as string);
+    const assignment = await Assignment.findById(req.params.id as string, req.userId!);
     if (!assignment) return res.status(404).json({ success: false, error: 'Not found' });
-
-    if (assignment.status === 'completed') {
-      await redis.setex(`assignment:${req.params.id}`, 600, JSON.stringify(assignment));
-    }
     return res.json({ success: true, data: assignment });
   } catch {
     return res.status(500).json({ success: false, error: 'Failed to fetch' });
@@ -90,12 +78,10 @@ router.post('/:id/regenerate', async (req: Request, res: Response) => {
     const assignment = await Assignment.findById(req.params.id as string, req.userId!);
     if (!assignment) return res.status(404).json({ success: false, error: 'Not found' });
 
-    const enrolled = await getDb().query('SELECT id FROM vedai_students WHERE assignment_id=$1 LIMIT 1', [assignment._id]);
+    const enrolled = await getDb().query('SELECT id FROM vedai_classroom_students WHERE assignment_id=$1 LIMIT 1', [assignment._id]);
     if (enrolled.rows.length) return res.status(409).json({ success: false, error: 'This paper has assigned students. Create a new paper to preserve their submissions.' });
     await Assignment.resetForRegenerate(assignment._id);
 
-    const redis = getRedis();
-    await redis.del(`assignment:${req.params.id}`);
 
     const queue = getAssignmentQueue();
     const job = await queue.add('generate', { assignmentId: assignment._id, clientId: req.body.clientId });
@@ -111,7 +97,6 @@ router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const removed = await Assignment.deleteById(req.params.id as string, req.userId!);
     if (!removed) return res.status(404).json({ success: false, error: 'Not found' });
-    await getRedis().del(`assignment:${req.params.id}`);
     return res.json({ success: true });
   } catch {
     return res.status(500).json({ success: false, error: 'Failed to delete' });
@@ -126,7 +111,6 @@ router.patch('/:id/rubric', async (req, res) => {
   if (!p.success || !q || p.data.levels.some(l => l.marks > q.marks)) return res.status(400).json({ success: false, error: 'Invalid marking guide' });
   Object.assign(q, { rubric: p.data.levels, rubricEdited: true });
   await Assignment.setCompleted(a._id, a.output);
-  await getRedis().del(`assignment:${a._id}`);
   return res.json({ success: true });
 });
 export default router;

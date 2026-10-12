@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import { PGlite } from '@electric-sql/pglite';
+import { SCHEMA_SQL } from '../src/services/db';
+import { verifyStudentCode } from '../src/routes/classroom';
+(async()=>{
+ const pg=new PGlite();await pg.exec(fs.readFileSync('test/fixtures/legacy-schema.sql','utf8'));
+ await pg.exec(`INSERT INTO vedai_assignments (id,title,subject,due_date,number_of_questions,total_marks,owner_id) VALUES ('a','A','Science',now(),1,5,'owner'),('b','B','Science',now(),1,5,'owner');`);
+ const key=crypto.createHash('sha256').update(`vedai-student:${process.env.AUTH_SECRET||process.env.DATABASE_URL||'dev-only-secret'}`).digest();
+ const hash=crypto.createHmac('sha256',key).update('ABCDE12345').digest('hex');
+ await pg.query("INSERT INTO vedai_students (id,assignment_id,owner_id,student_code,name,access_hash) VALUES ('s','a','owner','S001','Original',$1),('t','b','owner','S001','Other','anotherhash')",[hash]);
+ await pg.exec(`INSERT INTO vedai_submissions (student_row_id,assignment_id,owner_id,answers,marks,released) VALUES ('s','a','owner','{"q1":"student answer"}','{"q1":{"marks":2,"reason":"Missing a point"}}',true);`);
+ await pg.exec(SCHEMA_SQL);
+ let n=0;const check=(v:unknown,m:string)=>{assert.ok(v,m);n++;};
+ const rows=(await pg.query('SELECT * FROM vedai_classroom_students ORDER BY id')).rows as any[];
+ check(rows.length===2,'same student ID on different papers preserved');
+ check(rows[0].answers.q1==='student answer' && rows[0].marks.q1.marks===2 && rows[0].released,'answers, marks and release preserved');
+ check(verifyStudentCode('ABCDE-12345',rows[0].code_hash),'original access code still works');
+ check(!verifyStudentCode('wrong',rows[0].code_hash),'wrong legacy access code rejected');
+ await pg.exec("UPDATE vedai_classroom_students SET name='Updated' WHERE id='s'; DELETE FROM vedai_classroom_students WHERE id='t';");
+ await pg.exec(SCHEMA_SQL);
+ const r=(await pg.query('SELECT * FROM vedai_classroom_students')).rows as any[];
+ check(r.length===1 && r[0].name==='Updated','restarts do not overwrite or resurrect migrated records');
+ check((await pg.query('SELECT * FROM vedai_students')).rows.length===2,'original tables retained');
+ await pg.close();console.log(`Legacy migration tests passed (${n} assertions)`);
+})().catch(e=>{console.error(e);process.exit(1);});

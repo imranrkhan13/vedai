@@ -24,13 +24,13 @@ export function verifyPassword(pw: string, stored: string): boolean {
 
 const b64 = (b: Buffer | string) => Buffer.from(b).toString('base64url');
 
-export function signToken(uid: string, ttlSeconds = 7 * 24 * 3600): string {
-  const body = b64(JSON.stringify({ uid, exp: Math.floor(Date.now() / 1000) + ttlSeconds }));
+export function signToken(uid: string, ttlSeconds = 7 * 24 * 3600, aud?: string): string {
+  const body = b64(JSON.stringify({ uid, aud, exp: Math.floor(Date.now() / 1000) + ttlSeconds }));
   const sig = b64(crypto.createHmac('sha256', secret()).update(body).digest());
   return `${body}.${sig}`;
 }
 
-export function verifyToken(token: string): string | null {
+export function verifyToken(token: string, aud?: string): string | null {
   const [body, sig] = token.split('.');
   if (!body || !sig) return null;
   const want = crypto.createHmac('sha256', secret()).update(body).digest();
@@ -38,6 +38,7 @@ export function verifyToken(token: string): string | null {
   if (got.length !== want.length || !crypto.timingSafeEqual(got, want)) return null;
   try {
     const p = JSON.parse(Buffer.from(body, 'base64url').toString());
+    if ((p.aud || undefined) !== aud) return null;
     if (typeof p.uid !== 'string' || typeof p.exp !== 'number' || p.exp < Date.now() / 1000) return null;
     return p.uid;
   } catch { return null; }
@@ -49,6 +50,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const h = req.headers.authorization || '';
   const uid = h.startsWith('Bearer ') ? verifyToken(h.slice(7)) : verifyToken(readCookie(req, 'vedai_session'));
   if (!uid || uid.startsWith('student:')) return res.status(401).json({ success: false, error: 'Please sign in' });
+  if (!h.startsWith('Bearer ') && !['GET','HEAD','OPTIONS'].includes(req.method) && req.headers['x-requested-with'] !== 'quillix') return res.status(403).json({ success: false, error: 'Blocked request' });
   req.userId = uid;
   next();
 }

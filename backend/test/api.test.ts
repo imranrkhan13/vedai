@@ -1,4 +1,4 @@
-// HTTP + worker integration test on in-memory Postgres. Queue/Redis/WebSocket are stubbed; no AI keys set, so no provider calls.
+// HTTP + worker integration test on in-memory Postgres. Queue/WebSocket are stubbed; no AI keys set, so no provider calls.
 import { PGlite } from '@electric-sql/pglite';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -10,9 +10,7 @@ for (const k of ['GROQ_API_KEY', 'GEMINI_API_KEY','OPENROUTER_API_KEY','MISTRAL_
 
 const src = (f: string) => path.resolve(__dirname, '../src', f);
 const stub = (f: string, exports: any) => { require.cache[require.resolve(src(f))] = { id: src(f), filename: src(f), loaded: true, exports } as any; };
-const cache = new Map<string, string>();
 const jobs: any[] = [];
-stub('services/redis.ts', { getRedis: () => ({ get: async (k: string) => cache.get(k) ?? null, setex: async (k: string, _t: number, v: string) => { cache.set(k, v); }, del: async (k: string) => { cache.delete(k); }, publish: async () => 0 }) });
 stub('services/queue.ts', { getAssignmentQueue: () => ({ add: async (_n: string, data: any) => { const j = { id: String(jobs.length + 1), data }; jobs.push(j); return j; }, getJob: async () => null }) });
 const notices: any[] = [];
 stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.push([id, p]), initWebSocket: () => {} });
@@ -59,7 +57,7 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
   ok(r.body.data.status === 'completed' && o && Array.isArray(o.sections) && o.sections.length > 0, 'output persisted with sections');
   ok(typeof o.sections[0].title === 'string' && Array.isArray(o.sections[0].questions) && o.sections[0].questions[0].difficulty && typeof o.sections[0].questions[0].marks === 'number', 'output matches frontend Section/Question types');
   ok(typeof o.generatedAt === 'string' && o.totalMarks > 0, 'generatedAt string, totalMarks');
-  ok(cache.has('assignment:' + id), 'completed result cached');
+  ok(r.body.data.status === 'completed', 'completed result read from Postgres');
   ok(o.schoolName === 'SAMPLE PAPER (not AI-generated)', 'mock output is labelled');
   delete process.env.ALLOW_MOCK_OUTPUT;
 
@@ -82,7 +80,7 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
   ok(verifyPassword('correct horse', hashPassword('correct horse')) && !verifyPassword('wrong', hashPassword('correct horse')), 'password hashing');
   tok = T1;
   r = await j(`/${id}/regenerate`, { method: 'POST', body: JSON.stringify({ clientId: 'c1' }) });
-  ok(r.status === 200 && jobs.length === 2 && !cache.has('assignment:' + id), 'regenerate queues job, clears cache');
+  ok(r.status === 200 && jobs.length === 2, 'regenerate queues job');
   r = await j('/' + id); ok(r.body.data.status === 'pending' && r.body.data.output === undefined && r.body.data.jobId === '2', 'regenerate reset state');
 
   await processAssignmentJob({ id: '9', data: { assignmentId: '00000000-0000-0000-0000-000000000000' }, updateProgress: async () => {} } as any).then(() => assert.fail('should throw'), () => { n++; });

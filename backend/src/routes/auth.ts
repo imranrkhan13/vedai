@@ -53,5 +53,5 @@ router.get('/me', requireAuth, async (req: Request, res: Response) => {
 });
 
 router.post('/logout', (_req, res) => { res.clearCookie('vedai_session', { path: '/' }); res.json({ success: true }); });
-router.post('/ws-ticket', requireAuth, (req, res) => res.json({ success: true, data: { ticket: signToken(req.userId!, 60) } }));
+router.get('/ws-ticket', requireAuth, (req, res) => res.json({ success: true, data: { ticket: signToken(req.userId!, 60, 'ws') } }));
 export default router;

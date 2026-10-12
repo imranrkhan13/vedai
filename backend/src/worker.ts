@@ -1,4 +1,4 @@
-import { Worker, Job } from 'bullmq';
+import { Job, claimJob, renewLease, finishJob } from './services/queue';
 
 // Load .env only in dev
 if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
@@ -7,7 +7,6 @@ if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
 
 import { processGradingJob } from './services/grading';
 import { connectDB } from './services/db';
-import { getRedis } from './services/redis';
 import { Assignment } from './models/Assignment';
 import { generateQuestionPaper } from './services/aiGenerator';
 import { notifyClient } from './services/websocket';
@@ -67,19 +66,32 @@ export async function handleAssignmentFailure(job: Job | undefined, err: Error) 
 export async function startWorker(opts: { connect?: boolean } = {}) {
   if (opts.connect !== false) await connectDB();
 
-  const worker = new Worker('assignment-generation', processAssignmentJob, {
-    connection: getRedis(),
-    concurrency: Math.max(1, parseInt(process.env.WORKER_CONCURRENCY || '1', 10) || 1),
-  });
-
-  worker.on('completed', (job) => console.log(`✅ Job ${job.id} completed`));
-
-  worker.on('failed', async (job, err) => {
-    console.error(`❌ Job ${job?.id} failed:`, err.message);
-    await handleAssignmentFailure(job, err);
-  });
-
-  console.log('🔄 Worker started and listening for jobs...');
+  let running = false;
+  const tick = async () => {
+    if (running) return;
+    running = true;
+    let heartbeat: NodeJS.Timeout | undefined;
+    try {
+      const job = await claimJob();
+      if (!job) return;
+      heartbeat = setInterval(() => { renewLease(job).catch(console.error); }, 30000);
+      try {
+        if (job.attemptsMade >= job.opts.attempts) throw new Error('Worker recovery attempts exhausted');
+        await processAssignmentJob(job); await finishJob(job);
+      }
+      catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        await finishJob(job, error);
+        await handleAssignmentFailure(job, error);
+        console.error(`Job ${job.id} failed:`, error.message);
+      }
+    } catch (err) { console.error('Postgres worker error:', err); }
+    finally { if (heartbeat) clearInterval(heartbeat); running = false; }
+  };
+  const timer = setInterval(() => { void tick(); }, 2000);
+  void tick();
+  console.log('Postgres job worker started');
+  return { close: () => clearInterval(timer) };
 }
 
 if (require.main === module) {

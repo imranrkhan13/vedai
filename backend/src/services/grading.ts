@@ -39,14 +39,14 @@ export async function gradeAnswers(questions: IQuestion[], answers: Record<strin
 }
 
 export async function processGradingJob(studentId: string) {
-  const { rows } = await getDb().query('SELECT * FROM vedai_students WHERE id=$1', [studentId]);
+  const { rows } = await getDb().query('SELECT * FROM vedai_classroom_students WHERE id=$1', [studentId]);
   const s = rows[0]; if (!s?.submitted_at) return;
   const a = await Assignment.findById(s.assignment_id); if (!a?.output) return;
   try {
     const drafts = await gradeAnswers(a.output.sections.flatMap(sec => sec.questions), s.answers);
-    await getDb().query('UPDATE vedai_students SET drafts=$2::jsonb,grading_error=NULL WHERE id=$1', [s.id, JSON.stringify(drafts)]);
+    await getDb().query('UPDATE vedai_classroom_students SET drafts=$2::jsonb,grading_error=NULL WHERE id=$1', [s.id, JSON.stringify(drafts)]);
   } catch (e) {
-    await getDb().query('UPDATE vedai_students SET grading_error=$2 WHERE id=$1', [s.id, e instanceof Error ? e.message : 'Grading failed. Retry from teacher review.']);
+    await getDb().query('UPDATE vedai_classroom_students SET grading_error=$2 WHERE id=$1', [s.id, e instanceof Error ? e.message : 'Grading failed. Retry from teacher review.']);
     throw e;
   }
 }

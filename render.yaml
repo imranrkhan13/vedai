@@ -14,8 +14,6 @@ services:
         value: 4000
       - key: DATABASE_URL
         sync: false
-      - key: REDIS_URL
-        sync: false
       - key: FRONTEND_URL
         sync: false
       - key: GEMINI_API_KEY
@@ -45,8 +43,6 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
         sync: false
       - key: GEMINI_API_KEY
         sync: false

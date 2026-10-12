@@ -1,8 +1,5 @@
-import { redactSecrets } from './redact';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
-import { getRedis } from './redis';
-import Redis from 'ioredis';
 import { verifyToken } from './auth';
 
 const clients = new Map<string, WebSocket>();
@@ -12,7 +9,7 @@ export function initWebSocket(server: Server) {
 
   wss.on('connection', (ws, req) => {
     const url = new URL(req.url || '', 'http://localhost');
-    const uid = verifyToken(url.searchParams.get('ticket') || '');
+    const uid = verifyToken(url.searchParams.get('ticket') || '', 'ws');
     if (!uid || uid.startsWith('student:')) { ws.close(1008, 'Sign in required'); return; }
     const clientId = url.searchParams.get('clientId') || Math.random().toString(36).slice(2);
     clients.set(clientId, ws);
@@ -27,36 +24,6 @@ export function initWebSocket(server: Server) {
     ws.send(JSON.stringify({ type: 'connected', clientId }));
   });
 
-  // Redis pub/sub subscriber (separate connection from main client)
-  try {
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-    const isTLS = redisUrl.startsWith('rediss://');
-    const sub = new Redis(redisUrl, {
-      maxRetriesPerRequest: null,
-      tls: isTLS ? { rejectUnauthorized: false } : undefined,
-    });
-
-    sub.on('error', (err) => console.error('❌ Redis pub/sub error:', redactSecrets(err.message)));
-
-    sub.subscribe('ws:notify', (err) => {
-      if (err) console.error('Redis subscribe error:', redactSecrets(err.message));
-      else console.log('✅ WebSocket + Redis pub/sub initialized');
-    });
-
-    sub.on('message', (_channel, message) => {
-      try {
-        const { clientId, payload } = JSON.parse(message);
-        if (clientId === '__all__') {
-          clients.forEach(ws => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(payload)); });
-        } else {
-          const ws = clients.get(clientId);
-          if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(payload));
-        }
-      } catch {}
-    });
-  } catch (err) {
-    console.error('Redis pub/sub init failed:', redactSecrets(err));
-  }
 }
 
 export function notifyClient(clientId: string, payload: object) {
@@ -66,6 +33,5 @@ export function notifyClient(clientId: string, payload: object) {
     ws.send(JSON.stringify(payload));
     return;
   }
-  // Cross-process via Redis pub/sub
-  getRedis().publish('ws:notify', JSON.stringify({ clientId, payload })).catch(() => {});
+  // Separate workers report persisted status through the frontend's polling.
 }

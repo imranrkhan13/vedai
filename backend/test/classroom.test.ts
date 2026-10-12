@@ -18,7 +18,7 @@ import authRoutes from '../src/routes/auth';
  const server=app.listen(0);const base=`http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
  let n=0;
  const check=(v:unknown,m:string)=>{assert.ok(v,m);n++;};
- const request=async(path:string,method='GET',body?:unknown,cookie='')=>{const response=await fetch(base+path,{method,headers:{'Content-Type':'application/json',Cookie:cookie},body:body===undefined?undefined:JSON.stringify(body)});return {status:response.status,body:await response.json() as any,cookie:response.headers.get('set-cookie')?.split(';')[0] || ''};};
+ const request=async(path:string,method='GET',body?:unknown,cookie='')=>{const response=await fetch(base+path,{method,headers:{'Content-Type':'application/json','X-Requested-With':'quillix',Cookie:cookie},body:body===undefined?undefined:JSON.stringify(body)});return {status:response.status,body:await response.json() as any,cookie:response.headers.get('set-cookie')?.split(';')[0] || ''};};
  try {
  const registered=await request('/auth/register','POST',{email:'test@example.com',password:'test-password'});check(registered.status===201 && registered.cookie.startsWith('vedai_session='),'registration sets cookie');
  const teacher=registered.cookie;const owner=registered.body.data.user.id;
