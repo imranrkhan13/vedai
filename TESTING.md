@@ -24,3 +24,15 @@ Secrets are stored in ignored server-side configuration and are not included in 
 GitHub main commit `8032e38` deployed successfully to https://vedai-coral.vercel.app on October 12, 2026. Vercel build logs confirm the commit and a successful production build. The landing page was verified in the browser.
 
 The public API health check, synthetic teacher registration, and authenticated session lookup pass. Full production integration currently stops at assignment creation: HTTP 500, `Failed to create`. The API still exhibits the older backend release behavior. Production grading is therefore not verified; backend deployment access and logs are required to resolve the failure. The integration runner now sends the same CSRF header as the browser.
+
+## Redis removal and successful production retest
+
+October 12, 2026: replaced Redis caching/pub-sub and BullMQ with a durable PostgreSQL job queue. Removed Redis dependencies, Docker service and server configuration. Render backend now deploys main and uses the PostgreSQL worker. Existing student records, access codes, submitted answers and final marks are preserved by the tested one-time migration; original tables remain intact.
+
+- Automated tests: 136 assertions (including 13 queue assertions, 6 migration assertions, and CSRF/WebSocket ticket isolation).
+- Backend production build passes.
+- Real local PostgreSQL queue workflow: 63 assertions passed.
+- Public production workflow through https://vedai-coral.vercel.app/api: all 63 assertions passed after the Render deployment. Synthetic complete/partial/incorrect answers scored 15/15, 3/15 and 0/15 using Jev model `jev-1.13.0`.
+- Production test assignment: `d1191aa2-bae1-48ba-9e8a-2037f223aa21`.
+
+The earlier Redis-quota assignment failure is resolved. Queue tests cover deduplication, claim exclusion, retry delay, persisted attempts/progress, expired lease recovery, stale-worker completion protection, regrading and exhausted retries. Workers renew leases while running; separate workers are visible to the browser through polling.

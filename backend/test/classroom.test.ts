@@ -4,7 +4,7 @@ import express from 'express';
 import { AddressInfo } from 'node:net';
 import { SCHEMA_SQL, setDb } from '../src/services/db';
 import { Assignment } from '../src/models/Assignment';
-import { signToken } from '../src/services/auth';
+import { signToken, verifyToken } from '../src/services/auth';
 import path from 'node:path';
 import { processGradingJob } from '../src/services/grading';
 const queuePath = path.resolve(__dirname, '../src/services/queue.ts');
@@ -22,6 +22,8 @@ import authRoutes from '../src/routes/auth';
  try {
  const registered=await request('/auth/register','POST',{email:'test@example.com',password:'test-password'});check(registered.status===201 && registered.cookie.startsWith('vedai_session='),'registration sets cookie');
  const teacher=registered.cookie;const owner=registered.body.data.user.id;
+ const blocked=await fetch(base+'/roster/missing',{method:'POST',headers:{'Content-Type':'application/json',Cookie:teacher},body:'{}'});check(blocked.status===403,'teacher cookie mutation requires CSRF header');
+ const ticket=await request('/auth/ws-ticket','GET',undefined,teacher);check(!verifyToken(ticket.body.data.ticket) && verifyToken(ticket.body.data.ticket,'ws')===owner,'WebSocket ticket cannot authenticate teacher API');
  check((await request('/auth/me','GET',undefined,teacher)).status===200,'cookie login works');
  const a=await Assignment.create({title:'Photosynthesis',subject:'Science',dueDate:new Date('2026-11-01'),questionTypes:['Short'],numberOfQuestions:2,totalMarks:10,difficulty:'easy',fileContent:'Full syllabus text'},owner);
  await Assignment.setCompleted(a._id,{subject:'Science',totalMarks:10,generatedAt:new Date(),sections:[{title:'A',instruction:'Answer all',totalMarks:10,questions:[{id:'q1',text:'Explain photosynthesis',marks:5,type:'Short',difficulty:'easy',answer:'Sunlight makes glucose',markingPoints:[{text:'sunlight',marks:2},{text:'inputs and products',marks:3}]},{id:'q2',text:'What is produced?',marks:5,type:'Short',difficulty:'easy',answer:'Glucose and oxygen'}]}]});

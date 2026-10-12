@@ -8,7 +8,10 @@ export interface Job {
 function jobFrom(row: any): Job {
  return { id: row.id, name: row.name, data: row.data, progress: row.progress,
   attemptsMade: row.attempts_made, opts: { attempts: row.max_attempts }, failedReason: row.failed_reason, leaseToken: row.lease_token,
-  async updateProgress(progress) { await getDb().query('UPDATE vedai_jobs SET progress=$2 WHERE id=$1 AND lease_token=$3', [row.id, progress, row.lease_token]); },
+  async updateProgress(progress) {
+   const r = await getDb().query("UPDATE vedai_jobs SET progress=$2 WHERE id=$1 AND lease_token=$3 AND state='active'", [row.id, progress, row.lease_token]);
+   if (!r.rowCount) throw new Error('Job lease expired or reassigned');
+  },
   async getState() { const r = await getDb().query('SELECT state FROM vedai_jobs WHERE id=$1', [row.id]); return r.rows[0]?.state || 'unknown'; }
  };
 }
@@ -41,9 +44,10 @@ export async function renewLease(job: Job) {
  return !!r.rowCount;
 }
 export async function finishJob(job: Job, error?: Error) {
- if (!error) { await getDb().query("UPDATE vedai_jobs SET state='completed',progress=100,lease_token=NULL,lease_until=NULL WHERE id=$1 AND lease_token=$2", [job.id,job.leaseToken]); return; }
+ if (!error) { const r = await getDb().query("UPDATE vedai_jobs SET state='completed',progress=100,lease_token=NULL,lease_until=NULL WHERE id=$1 AND lease_token=$2", [job.id,job.leaseToken]); return !!r.rowCount; }
  job.attemptsMade++;
  const retry = job.attemptsMade < job.opts.attempts;
- await getDb().query(`UPDATE vedai_jobs SET state=$3,attempts_made=$4,failed_reason=$5,lease_token=NULL,lease_until=NULL,
+ const r = await getDb().query(`UPDATE vedai_jobs SET state=$3,attempts_made=$4,failed_reason=$5,lease_token=NULL,lease_until=NULL,
   available_at=now()+($6 * interval '1 second') WHERE id=$1 AND lease_token=$2`, [job.id,job.leaseToken,retry?'waiting':'failed',job.attemptsMade,error.message,Math.min(60,2 ** job.attemptsMade)]);
+ return !!r.rowCount;
 }

@@ -81,8 +81,7 @@ export async function startWorker(opts: { connect?: boolean } = {}) {
       }
       catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
-        await finishJob(job, error);
-        await handleAssignmentFailure(job, error);
+        if (await finishJob(job, error)) await handleAssignmentFailure(job, error);
         console.error(`Job ${job.id} failed:`, error.message);
       }
     } catch (err) { console.error('Postgres worker error:', err); }
