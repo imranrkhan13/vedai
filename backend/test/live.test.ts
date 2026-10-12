@@ -6,7 +6,7 @@ const email = `live-${tag}@example.test`, password = 'Synthetic-Classroom-Test-2
 let checks = 0;
 const check = (v: unknown, message: string) => { assert.ok(v,message); checks++; };
 async function api(path: string, method = 'GET', body?: unknown, cookie = '') {
- const r = await fetch(base+path,{method,signal:AbortSignal.timeout(30000),headers:{'Content-Type':'application/json',Cookie:cookie},body:body===undefined?undefined:JSON.stringify(body)});
+ const r = await fetch(base+path,{method,signal:AbortSignal.timeout(30000),headers:{'Content-Type':'application/json','X-Requested-With':'quillix',Cookie:cookie},body:body===undefined?undefined:JSON.stringify(body)});
  return {status:r.status,body:await r.json() as any,cookie:r.headers.get('set-cookie')?.split(';')[0] || ''};
 }
 async function poll<T>(fn:()=>Promise<T>, ready:(r:T)=>boolean, label:string) {
@@ -19,7 +19,7 @@ async function poll<T>(fn:()=>Promise<T>, ready:(r:T)=>boolean, label:string) {
  check((await api('/auth/me','GET',undefined,cookie)).body.data.email===email,'cookie session');
  const syllabus = `FULL SYNTHETIC SCIENCE SYLLABUS\nChapter 1: Plants and photosynthesis. Plants use sunlight, carbon dioxide and water to produce glucose and oxygen. Chlorophyll absorbs light energy. Photosynthesis occurs in chloroplasts.\nChapter 2: Forces. Newton's second law states force equals mass times acceleration. Force is measured in newtons, mass in kilograms and acceleration in metres per second squared.\n` + 'Classroom activities: observe leaves, compare forces with different masses, and discuss how evidence supports a scientific explanation.\n'.repeat(20) + `\nFINAL CHAPTER: Electric circuits. A closed circuit is required for current to flow. A battery provides potential difference, wires conduct electricity, a switch opens or closes the circuit, and a lamp converts electrical energy to light and heat. An open circuit has a break and prevents current flow.\n`;
  const created=await api('/assignments','POST',{title:'Live syllabus workflow test',subject:'Science',dueDate:'2026-12-01',questionTypes:['Short'],questionPlan:[{type:'Short',qty:3,marks:5}],numberOfQuestions:3,totalMarks:15,difficulty:'mixed',fileContent:syllabus,additionalInstructions:'Use only this syllabus. Generate exactly one question on photosynthesis, one on Newton second law and one on closed electric circuits from the final chapter. Each question needs distinct weighted marking points adding to five marks. Provide a model answer covering all points.'},cookie);
- check(created.status===201,'live assignment creation');const aid=created.body.data.id;console.log('Live generation queued:',aid);
+ check(created.status===201,`live assignment creation (${created.status}): ${created.body.error || 'unexpected response'}`);const aid=created.body.data.id;console.log('Live generation queued:',aid);
  const paper=await poll(()=>api(`/assignments/${aid}`,'GET',undefined,cookie),r=>['completed','failed'].includes(r.body.data?.status),'Generation');
  check(paper.body.data.status==='completed',`live generation failed: ${paper.body.data.error || ''}`);
  const assignment=paper.body.data;check(assignment.fileContent===syllabus,'entire syllabus preserved');check(!assignment.output.schoolName?.includes('SAMPLE'),'real AI output, not mock');

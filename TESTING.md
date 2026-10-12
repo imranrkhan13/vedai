@@ -18,3 +18,9 @@ Verified on October 12, 2026 against the isolated local PostgreSQL database and 
 - Tests use synthetic records. This is not a verification against real student submissions or a formal assessment of grading accuracy across subjects.
 
 Secrets are stored in ignored server-side configuration and are not included in this report or browser code.
+
+## Production verification
+
+GitHub main commit `8032e38` deployed successfully to https://vedai-coral.vercel.app on October 12, 2026. Vercel build logs confirm the commit and a successful production build. The landing page was verified in the browser.
+
+The public API health check, synthetic teacher registration, and authenticated session lookup pass. Full production integration currently stops at assignment creation: HTTP 500, `Failed to create`. The API still exhibits the older backend release behavior. Production grading is therefore not verified; backend deployment access and logs are required to resolve the failure. The integration runner now sends the same CSRF header as the browser.
