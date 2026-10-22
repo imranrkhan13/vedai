@@ -52,10 +52,12 @@ export default function AIToolkitPage() {
     if(!el) return;
     setDownloading(true);
     try {
-      const html2pdf=(await import('html2pdf.js')).default;
-      await html2pdf().set({ margin:[12,12], filename:`${selected?.title||'paper'}-edited.pdf`, html2canvas:{ scale:2 }, jsPDF:{ unit:'mm', format:'a4' } }).from(el).save();
+      if(!selected?.output)throw new Error('Select a completed paper first.');
+      if(sections.some(s=>s.questions.some(q=>q._editing)))throw new Error('Finish or cancel the current question edit before exporting.');
+      const {downloadPaperPdf}=await import('@/lib/paperPdf');
+      await downloadPaperPdf({title:`${selected.title}-edited`,output:{...selected.output,totalMarks,sections:sections.filter(s=>s.questions.length).map(s=>({...s,totalMarks:s.questions.reduce((n,q)=>n+q.marks,0)}))}},false);
       toast.success('PDF downloaded!');
-    } catch { toast.error('PDF failed'); }
+    } catch(err) { toast.error(err instanceof Error?err.message:'PDF failed'); }
     finally { setDownloading(false); }
   };
 

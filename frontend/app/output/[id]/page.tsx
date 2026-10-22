@@ -5,6 +5,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/ui/Topbar';
 import { useAssignmentStore } from '@/store/assignmentStore';
 import { api } from '@/lib/api';
+import { sectionInstruction } from '@/lib/paperText';
 import { Section, Question } from '@/types';
 import toast from 'react-hot-toast';
 import { Loader2, Download, RefreshCw, Copy, Check, ArrowLeft, CheckCircle } from 'lucide-react';
@@ -88,10 +89,11 @@ export default function OutputPage() {
     setDownloading(true);
     toast('Preparing PDF...');
     try {
-      const html2pdf = (await import('html2pdf.js')).default;
-      await html2pdf().set({ margin:[12,12,12,12], filename:`${currentAssignment?.title||'question-paper'}.pdf`, html2canvas:{ scale:2, useCORS:true, logging:false }, pagebreak:{ mode:['css','legacy'], avoid:['.avoid-break','h3'] }, jsPDF:{ unit:'mm', format:'a4', orientation:'portrait' } } as any).from(printRef.current).save();
+      const {downloadPaperPdf}=await import('@/lib/paperPdf');
+      if(!currentAssignment?.output)throw new Error('Paper unavailable');
+      await downloadPaperPdf({title:currentAssignment.title,output:currentAssignment.output},false,{name:studentName,roll:rollNo,section:sectionVal});
       toast.success('PDF downloaded!');
-    } catch { toast.error('PDF failed'); }
+    } catch(err) { toast.error(err instanceof Error?err.message:'PDF failed'); }
     finally { setDownloading(false); }
   };
 
@@ -100,10 +102,11 @@ export default function OutputPage() {
     setGuideBusy(true);
     toast('Preparing teacher guide...');
     try {
-      const html2pdf = (await import('html2pdf.js')).default;
-      await html2pdf().set({ margin:[12,12,12,12], filename:`${currentAssignment?.title||'question-paper'} - teacher guide.pdf`, html2canvas:{ scale:2, useCORS:true, logging:false }, pagebreak:{ mode:['css','legacy'], avoid:['.avoid-break'] }, jsPDF:{ unit:'mm', format:'a4', orientation:'portrait' } } as any).from(guideRef.current).save();
+      const {downloadPaperPdf}=await import('@/lib/paperPdf');
+      if(!currentAssignment?.output)throw new Error('Paper unavailable');
+      await downloadPaperPdf({title:currentAssignment.title,output:currentAssignment.output},true);
       toast.success('Teacher guide downloaded!');
-    } catch { toast.error('PDF failed'); }
+    } catch(err) { toast.error(err instanceof Error?err.message:'PDF failed'); }
     finally { setGuideBusy(false); }
   };
 
@@ -254,7 +257,7 @@ export default function OutputPage() {
                   {a.output.sections.map((sec:Section,si:number)=>{ const qOffset=a.output!.sections.slice(0,si).reduce((n:number,x:Section)=>n+x.questions.length,0); return (
                     <div key={si} style={{ paddingTop:22, paddingBottom:8, borderBottom:si<a.output!.sections.length-1?'1px dashed var(--border)':'none' }}>
                       <h3 style={{ fontSize:15, fontWeight:700, color:'var(--black)', textAlign:'center', marginBottom:2 }}>{sec.title}</h3>
-                      <p style={{ fontSize:12, color:'var(--gray-500)', fontStyle:'italic', textAlign:'center', marginBottom:2 }}>{sec.instruction}</p>
+                      <p style={{ fontSize:12, color:'var(--gray-500)', fontStyle:'italic', textAlign:'center', marginBottom:2 }}>{sectionInstruction(sec.questions)}</p>
                       <ol style={{ listStyle:'none', padding:0 }}>
                         {sec.questions.map((q:Question,qi:number)=>(
                           <li key={q.id||qi} className="avoid-break" style={{ breakInside:'avoid', pageBreakInside:'avoid', display:'flex', gap:8, marginBottom:12, fontSize:13, color:'var(--black)', lineHeight:1.6 }}>
@@ -263,7 +266,7 @@ export default function OutputPage() {
                               <span style={{ color:'var(--gray-500)' }}>[{DIFF_LABEL[q.difficulty]||q.difficulty}] </span>
                               {q.text}
                               <span style={{ fontWeight:600, color:'var(--gray-700)' }}> [{q.marks} Mark{q.marks>1?'s':''}]</span>
-                              {(a as any).fileContent&&(<div data-html2canvas-ignore="true" style={{ marginTop:6, fontSize:11, color:'var(--gray-500)', fontStyle:'italic' }}>{q.evidence?<>Sentence the model says it used (found word for word in your text; this does not prove the question follows from it): &ldquo;{q.evidence}&rdquo;</>:<>Review: no sentence from your source was matched to this question. Please check it yourself. (Copy check only, not a judgment of correctness.)</>}</div>)}
+                              {(a as any).fileContent&&(<div data-html2canvas-ignore="true" style={{ marginTop:6, fontSize:11, color:'var(--gray-500)', fontStyle:'italic' }}>{q.evidence?<>Source excerpt supplied with the draft (compare it with your notes; this is not proof of correctness): &ldquo;{q.evidence}&rdquo;</>:<>Review: no sentence from your source was matched to this question. Please check it yourself. (Copy check only, not a judgment of correctness.)</>}</div>)}
                               {q.options&&q.options.length>0&&(
                                 <ol style={{ listStyle:'none', padding:0, margin:'6px 0 0' }}>
                                   {q.options.map((o:string,oi:number)=>(<li key={oi} style={{ marginBottom:2 }}>({String.fromCharCode(97+oi)}) {o}</li>))}

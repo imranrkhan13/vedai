@@ -62,3 +62,44 @@ Backend suite: **188 assertions passed** (model 18, HTTP/worker 71, classroom 26
 Focused real-provider local smoke test: assignment `311b98d7-b8ca-4bfe-8ea0-0f3bbd0a09f9`, four questions / six marks, Grade 8 friction and sound, exactly 656 source characters preserved. Three invalid-source requests returned HTTP 400 with no assignments created. All four questions included exact source excerpts; both MCQs had one correct option. Manual agent review found the answers source-supported, but one two-mark written rubric repeated the same idea, and the easy grip recall question was labelled challenging. This is **not teacher acceptance** or evidence of broad paper/grading quality. Teacher review remains necessary before use.
 
 PDF export polish remains open: exports still use image-based html2pdf, and pagination/searchable text need a separate implementation and rendered-PDF test. Photo uploads, 10 versions, provider rate limits and a physical phone were not tested in this slice. Existing synthetic user test records were preserved.
+
+## Scoped launch fixes after d0ada99 — October 22, 2026
+
+This slice preserves the existing upload/editor and classroom layout. Existing user records were not edited or removed. New synthetic records were used for browser and HTTP tests.
+
+### Actual verification run
+
+- **Full backend suite rerun: 271 assertions passed**, including the earlier regression coverage: model 18, HTTP/worker 82, classroom 26, grading 12, queue 13, migration 6, provider fallback 9, objective/written grading 16, source extraction/guards 17, review/template checks 17, rubric evaluation contracts 55. Provider tests intercept requests; no paid provider calls were made.
+- Backend TypeScript and frontend production builds passed. Frontend compilation initially hit sandbox restrictions on binding a compiler port; the permitted rerun passed. This is build/type verification, not a claim that the existing repository lint baseline is clean.
+- Section instructions now derive from actual question marks, including old stored `N marks` instructions. Generation rejects template tokens in questions and duplicate normalized marking criteria. PDF export rejects template text or unsupported glyphs rather than silently printing/omitting them.
+- Direct **production create API** bypass: eight invalid sources (missing, empty, whitespace, punctuation, null, number, object, oversized) returned HTTP 400 / `INVALID_SOURCE`. The new synthetic account had zero assignments afterward. Production database/job counts were not directly inspected.
+- Direct **running local backend regeneration API** bypass: four newly seeded invalid-source assignments returned HTTP 400 / `INVALID_SOURCE`, created zero PostgreSQL jobs and preserved their prior failed status. No production invalid-source record was edited to run this test. Isolated integration tests additionally prove invalid-source workers and regeneration make zero provider calls; valid create/regenerate regression paths still pass.
+- Browser at **1280×900 and 390×844**: empty and partial Save all inputs show persistent explanations, red field borders and per-question messages; the first invalid field receives focus. A teacher-entered zero/comment survived bulk suggestions. Complete marks saved, remained after full reload, and could be shared. Empty/partial marks and edits after saving were blocked from sharing. A deliberate local backend outage produced clear failure feedback while retaining form entries; retry after restoration succeeded.
+- Browser student check: released 10/10 synthetic result visible; submitted MCQ controls disabled, written fields read-only and no submit button. API classroom tests also cover submission lock, hidden drafts, saved marks and release guards.
+
+### PDFs
+
+Replaced image-based html2pdf exports with jsPDF text documents and embedded DejaVu fonts. Student and teacher documents are built from explicit separate fields; answers/criteria/source excerpts never enter student export. The toolkit edited-paper export also uses the same text exporter; its edit state must be finished before export. The old html2pdf dependency was removed. A build caught that remaining toolkit import during cleanup; it was migrated before the final build.
+
+`npm run test:pdf` in `backend` generates a seven-question / ten-mark Grade 8 fixture through the same export function. `backend/test/check-pdfs.py` (Python with pdfplumber) checks every question/mark, search, extracted text order, no page images, student answer-guide exclusion, bounds and scientific glyphs. Two additional PDF guard assertions cover template tokens and unsupported glyphs.
+
+- Normal student paper: **1 page**, 1,011 selectable characters, zero images.
+- Teacher fixture guide: **2 pages**, 3,134 selectable characters, zero images.
+- Long-layout stress: 4 pages; Greek alpha/beta and superscript squared present. Oversized blocks flow across pages and all text bounds remain inside margins; a long guide can still have a sparsely filled final page.
+- Both actual browser download buttons were exercised. Downloaded student/teacher files were copied to `output/pdf/browser-*.pdf`, rendered with Poppler and visually inspected on every page. Student: one page / 1,011 selectable characters; teacher: two pages / 2,921 selectable characters; zero page images. Search/extraction worked and the student file contained no answer-guide sections. The browser fixture used intentionally seeded synthetic evidence; it is an export test, not a source-grounding evaluation.
+- Native Preview verification: searching the student PDF for `friction` found five matches; searching the teacher guide for `Criterion` found matches on page two. Select-all/copy/paste in Preview reproduced the complete selectable text for both PDFs, including both teacher pages.
+- Rendered standard fixtures and all stress pages were also inspected. No clipping or overlap found. `output/pdf/` contains PDFs and PNG previews; `output/qa/` contains desktop/mobile screenshots and machine-readable results. These generated artifacts are ignored by Git; reproducible tests and the teacher packet are committed.
+
+### Rubrics and cost boundary
+
+Generation instructions require independent question/source-specific criteria, exact allocations, no repeated facts or credit for copying the question, concrete partial-credit steps, consistent model examples and valid alternative wording. Exact duplicate criteria are structurally rejected, but semantic independence and correctness are not proven by that check or a source quote.
+
+Every written score is now explicitly a teacher-review draft, including confidently returned checks. Bulk suggestions exclude unreviewed written drafts and never overwrite teacher-entered marks/comments. Teachers can inspect a draft, enter their own score, save and share; no answer is automatically rejected or a draft released based on an unvalidated rubric.
+
+Inspection confirmed blank answers already bypassed Jev. They now report `local-blank` / `Local no-answer check`, zero marks and a clear statement that no provider was called. Mocked tests exercise blank/no-call behavior, correct/partial/wrong/alternative answers, rate-limit responses, malformed/incomplete results and network failures. The existing weighted multi-mark contract test verifies explicit half-credit arithmetic. Failures keep submissions available for teacher review.
+
+`output/qa/rubric-samples.json` records **15 samples across three two-mark questions**: developer/AI expected marks, suggested marks and reasons. All expected/suggested values agree because provider decisions are mocked to exercise the contract. **This is not a live-model accuracy result or teacher approval.** See `TEACHER_PILOT.md` for independent teacher review instructions and sample criteria.
+
+### Remaining gaps
+
+No live Jev grading or new live AI paper-quality evaluation was run: no paid budget/spend cap is approved. Current prompt/rubric changes need independent real-teacher assessment and a representative pilot before any launch-ready accuracy claim. Source quotations remain audit evidence, never proof of correctness. The toolkit edited-paper path uses the shared exporter and passed the build, but its separate edit/download UI was not browser-tested. Actual uploaded-source/browser extraction was not repeated in this slice; the 17 source regression checks were rerun and its UI flow was left intact. Photo uploads, ten paper versions, rate-limit/load testing and a physical phone remain untested. PDF fixtures cover English and selected scientific symbols; unembedded scripts/glyphs block export, and diagrams/rich mathematical typesetting remain outside the text-export coverage.

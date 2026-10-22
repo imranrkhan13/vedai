@@ -11,8 +11,9 @@
     "start:dev": "ts-node src/index.ts",
     "worker": "node dist/worker.js",
     "worker:dev": "ts-node src/worker.ts",
-    "test": "ts-node test/model.test.ts && ts-node test/api.test.ts && ts-node test/classroom.test.ts && ts-node test/grading.test.ts && ts-node test/queue.test.ts && ts-node test/migration.test.ts && ts-node test/provider-fallback.test.ts && ts-node test/objective-grading.test.ts && ts-node test/source.test.ts",
-    "test:live": "ts-node test/live.test.ts"
+    "test": "ts-node test/model.test.ts && ts-node test/api.test.ts && ts-node test/classroom.test.ts && ts-node test/grading.test.ts && ts-node test/queue.test.ts && ts-node test/migration.test.ts && ts-node test/provider-fallback.test.ts && ts-node test/objective-grading.test.ts && ts-node test/source.test.ts && ts-node test/review.test.ts && ts-node test/rubric-evaluation.test.ts",
+    "test:live": "ts-node test/live.test.ts",
+    "test:pdf": "ts-node --compiler-options '{\"lib\":[\"ES2020\",\"DOM\"]}' test/pdf.test.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

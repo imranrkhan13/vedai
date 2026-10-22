@@ -26,6 +26,9 @@ RULES:
 - Questions must be specific, academically rigorous, and about ${a.subject}
 - Each question must have: text, difficulty (easy|medium|hard), marks (number), type (string), concept (2-4 words naming the single fact or skill it tests; every question needs a different concept), answer (the correct answer or a short model answer)
 - For written answers, prefer one independently assessable fact or step per mark, with concrete criteria for reasoning, examples or calculations when the question asks for them.
+- Do not award marks for repeating information given in the question. Never split one fact into synonymous criteria. Each mark must represent new assessable understanding supported by the notes. If a topic supports only one fact, combine it with another sourced fact to justify the requested marks.
+- Partial credit: list distinct criteria with their exact weights. Accept correct equivalent wording and methods. For any criterion worth more than one mark, describe the intermediate understanding that earns half credit (rounded down); do not use generic effort or length.
+- Rubric levels must name the actual facts or steps for this question, be consistent with the marking points and available marks, and contain sourced model examples. Source quotation matches do not validate a rubric.
 - Every question must include "markingPoints": an array of independent assessable facts/steps {"text": "specific expected fact", "marks": integer}. Their marks must sum exactly to the question marks. Use these to explain credit and deductions.
 - Questions worth 3 or more marks should include "rubric": three {"marks": integer, "descriptor": "concrete assessment level", "example": "sample answer"} entries.
 - Every MCQ must have exactly ONE unambiguously correct option; all distractors must be incorrect. Never include synonymous answers, equivalent formulas or rearranged equations as separate options.
@@ -44,7 +47,7 @@ JSON schema:
   "sections": [
     {
       "title": "Section A",
-      "instruction": "Attempt all questions. Each question carries N marks.",
+      "instruction": "Attempt all questions. Marks are shown beside each question.",
       "totalMarks": number,
       "questions": [
         { "text": "Full question text here", "difficulty": "easy", "marks": 1, "type": "MCQ", "concept": "organelle function", "options": ["choice 1", "choice 2", "choice 3", "choice 4"], "answer": "choice 2" }
@@ -291,6 +294,8 @@ export function parseResponse(raw: string, a: IAssignment): IGeneratedOutput {
       if (Array.isArray(q.markingPoints) && q.markingPoints.length > 0 && q.markingPoints.length <= 20) {
         const points = q.markingPoints.map((p: any) => ({ text: stripNul(String(p.text || '')).trim(), marks: Number(p.marks) }));
         if (points.some((p: any) => !p.text || !Number.isInteger(p.marks) || p.marks < 1) || points.reduce((n: number,p: any) => n+p.marks,0) !== out.marks) throw new Error('Invalid marking-point allocation');
+        const criteria=points.map((p:any)=>p.text.toLowerCase().replace(/[^\p{L}\p{N}]/gu,''));
+        if(new Set(criteria).size!==criteria.length) throw new Error('Repeated marking criteria; paper needs revision');
         out.markingPoints = points;
       }
       if (Array.isArray(q.rubric) && q.rubric.length === 3) {
@@ -299,7 +304,10 @@ export function parseResponse(raw: string, a: IAssignment): IGeneratedOutput {
       }
       return out;
     });
-    return { title: sec.title || 'Section', instruction: sec.instruction || 'Attempt all questions.', questions, totalMarks: questions.reduce((s, q) => s + q.marks, 0) };
+    const values=[...new Set(questions.map(q=>q.marks))];
+    const instruction=values.length===1 ? `Attempt all questions. Each question carries ${values[0]} mark${values[0]===1?'':'s'}.` : 'Attempt all questions. Marks are shown beside each question.';
+    if(/\b(?:N|X|XX|TBD|TODO)\s+marks?\b|\{\{[^}]+\}\}|\[(?:insert|placeholder)[^\]]*\]/i.test(JSON.stringify(questions))) throw new Error('Unresolved template token in generated questions');
+    return { title: sec.title || 'Section', instruction, questions, totalMarks: questions.reduce((s, q) => s + q.marks, 0) };
   });
   validatePaper(sections, a);
   return { subject: parsed.subject || a.subject, totalMarks: sections.reduce((n, sec) => n + sec.totalMarks, 0), duration: parsed.duration || '2 hours', grade: parsed.grade || '', sections, generatedAt: new Date() };

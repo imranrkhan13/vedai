@@ -10,6 +10,7 @@ export interface Question {
   options?: string[];
   answer?: string;
   evidence?: string;
+  markingPoints?: {text:string;marks:number}[];
   rubric?: { marks: number; descriptor: string; example: string }[];
   rubricEdited?: boolean;
   grade?: {

@@ -6,3 +6,4 @@ dist/
 *.log
 backend/test/live-result.json
 .vercel
+/output/

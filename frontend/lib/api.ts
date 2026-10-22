@@ -14,7 +14,7 @@ async function fetchAPI<T>(path: string, options?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'quillix' },
     ...options,
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => { throw new Error(`Server unavailable (HTTP ${res.status}). Please retry; saving was not confirmed.`); });
   if (res.status === 401 && !path.startsWith('/auth/') && !path.startsWith('/student') && typeof window !== 'undefined') {
     auth.clear();
     window.location.href = '/login';
