@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/ui/Topbar';
 import { useAssignmentStore } from '@/store/assignmentStore';
+import { readTextSource, normalizeSource, sourceProblem, MAX_SOURCE_CHARACTERS } from '@/lib/sourceText';
 import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { Upload, X, Loader2, Plus, Minus } from 'lucide-react';
@@ -30,6 +31,9 @@ export default function CreatePage() {
   const [batchWarn, setBatchWarn] = useState<string[]>([]);
   const [fileName, setFileName] = useState('');
   const [fileContent, setFileContent] = useState('');
+  const [sourceStatus, setSourceStatus] = useState<'idle'|'reading'|'ready'|'error'>('idle');
+  const [sourceError, setSourceError] = useState('');
+  const readRequest = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const [errors, setErrors] = useState<Record<string,string>>({});
   const [subject, setSubject] = useState('');
@@ -65,12 +69,15 @@ export default function CreatePage() {
     pdfjs.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.mjs';
     const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
     let out = '';
-    for(let p=1; p<=Math.min(doc.numPages,20) && out.length<20000; p++){
+    try {
+    for(let p=1; p<=doc.numPages; p++){
       const page = await doc.getPage(p);
       const tc = await page.getTextContent();
       out += tc.items.map((it:any)=>it.str).join(' ') + '\n';
+      if(out.length>MAX_SOURCE_CHARACTERS) throw new Error('Source notes exceed 100,000 characters. Split the PDF into smaller documents.');
     }
-    return out.replace(/\0/g,'').trim();
+    return normalizeSource(out);
+    } finally { await doc.destroy(); }
   };
 
   const readImageText = async (file:File) => {
@@ -87,46 +94,32 @@ export default function CreatePage() {
   };
 
   const readFile = async (file:File) => {
-    const isPdf = /\.pdf$/i.test(file.name);
-    const isImg = /\.(png|jpe?g|webp)$/i.test(file.name) || /^image\/(png|jpeg|webp)$/.test(file.type);
-    if(!isPdf && !isImg && !/\.txt$/i.test(file.name)){ toast.error('Supported files: .txt, text-based .pdf, or a PNG/JPG/WebP image of printed text'); return; }
-    if(file.size>10*1024*1024){ toast.error('Max 10MB'); return; }
-    if(isImg){
-      const t = toast.loading('Reading text from the image...');
-      try {
-        const text = await readImageText(file);
-        toast.dismiss(t);
-        if(text.length<20){ toast.error('Could not find readable printed text in this image. Try a clearer, straighter photo.'); return; }
-        setFileName(file.name); setFileContent(text);
-        toast.success('Text read from the image.');
-      } catch(err:unknown) {
-        toast.dismiss(t);
-        toast.error(err instanceof Error && err.message==='OCR_LOADER'
-          ? 'The image reader could not be loaded (it needs access to cdn.jsdelivr.net). Check your connection or use a .txt file.'
-          : 'This image could not be read. Try another image.');
-      }
-      return;
+    const request = ++readRequest.current;
+    setFileName(file.name); setFileContent(''); setSourceError(''); setSourceStatus('reading');
+    setErrors(previous=>({...previous,source:''}));
+    const isPdf=/\.pdf$/i.test(file.name), isImg=/\.(png|jpe?g|webp)$/i.test(file.name) || /^image\/(png|jpeg|webp)$/.test(file.type);
+    try {
+      if(!isPdf && !isImg && !/\.txt$/i.test(file.name)) throw new Error('Supported files: TXT, text-based PDF, or PNG/JPG/WebP.');
+      if(file.size>10*1024*1024) throw new Error('File exceeds 10 MB. Choose a smaller document.');
+      const text=normalizeSource(isPdf ? await readPdfText(file) : isImg ? await readImageText(file) : await readTextSource(file));
+      if(request!==readRequest.current) return;
+      const problem=sourceProblem(text);
+      if(problem) throw new Error(isPdf && !text ? 'This PDF has no selectable text. Paste the notes below or upload a clear image.' : problem);
+      setFileContent(text); setSourceStatus('ready');
+      toast.success(`${text.length.toLocaleString()} characters read. Review the source below.`);
+    } catch(err) {
+      if(request!==readRequest.current) return;
+      const message=err instanceof Error ? err.message : 'Could not read this source.';
+      const friendly=/^(PDF_LOADER|OCR_LOADER)$/.test(message) ? 'The document reader could not load. Check your connection, try a TXT file, or paste your notes below.' : message;
+      setFileContent('');setSourceStatus('error');setSourceError(friendly);toast.error(friendly);
     }
-    if(isPdf){
-      try {
-        const text = await readPdfText(file);
-        if(text.length<20){ toast.error('This PDF has no selectable text (scanned PDFs are not supported)'); return; }
-        setFileName(file.name); setFileContent(text);
-      } catch(err:unknown) {
-        toast.error(err instanceof Error && err.message==='PDF_LOADER'
-          ? 'The PDF reader could not be loaded (it needs access to cdn.jsdelivr.net). Check your connection or use a .txt file.'
-          : 'This PDF could not be read (it may be damaged or password-protected). Try another file or a .txt file.');
-      }
-      return;
-    }
-    setFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = ev => setFileContent(ev.target?.result as string||'');
-    reader.readAsText(file);
   };
+  const clearSource = () => { ++readRequest.current;setFileName('');setFileContent('');setSourceError('');setSourceStatus('idle');if(fileRef.current) fileRef.current.value=''; };
 
   const validate = () => {
     const e:Record<string,string> = {};
+    if(sourceStatus==='reading') e.source='Wait for the source to finish reading.';
+    else { const problem=sourceProblem(fileContent);if(problem) e.source=problem; }
     if(!subject.trim()) e.subject='Required';
     if(!dueDate) e.dueDate='Required';
     if(qRows.length===0) e.qRows='Add at least one question type';
@@ -148,7 +141,7 @@ export default function CreatePage() {
       questionPlan: qRows.map(r=>({ type:r.type, qty:r.qty, marks:r.marks })),
       numberOfQuestions: totalQ, totalMarks: totalM,
       difficulty: 'mixed' as const,
-      fileContent: fileContent||undefined,
+      fileContent: normalizeSource(fileContent),
       clientId: clientId||undefined,
     };
     const baseTitle = title.trim()||`${subject} Assessment`;
@@ -222,7 +215,7 @@ export default function CreatePage() {
             <h2 style={{ fontSize:14, fontWeight:600, marginBottom:3, color:'var(--black)' }}>Assignment Details</h2>
             <p style={{ fontSize:12, color:'var(--gray-400)', marginBottom:18 }}>Basic information about your assignment</p>
 
-            <input ref={fileRef} type="file" accept=".txt,.pdf,.png,.jpg,.jpeg,.webp,text/plain,application/pdf,image/png,image/jpeg,image/webp" style={{ display:'none' }} onChange={e=>e.target.files?.[0]&&readFile(e.target.files[0])}/>
+            <input ref={fileRef} type="file" accept=".txt,.pdf,.png,.jpg,.jpeg,.webp,text/plain,application/pdf,image/png,image/jpeg,image/webp" style={{ display:'none' }} onChange={e=>{const file=e.currentTarget.files?.[0];e.currentTarget.value='';if(file) void readFile(file);}}/>
             {!fileName?(
               <div onClick={()=>fileRef.current?.click()}
                 onDragOver={e=>{e.preventDefault();setDragOver(true);}}
@@ -240,16 +233,20 @@ export default function CreatePage() {
               <><div className="fade-in" style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'var(--orange-dim)', borderRadius:8, border:'1px solid var(--orange-border)', marginBottom:16 }}>
                 <span style={{ fontSize:18 }}>📄</span>
                 <span style={{ flex:1, fontSize:13, fontWeight:500, color:'var(--black)' }}>{fileName}</span>
-                <button onClick={()=>{setFileName('');setFileContent('');}} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--gray-400)', padding:4, borderRadius:5, display:'flex', transition:'color 0.12s' }}
+                <button onClick={clearSource} aria-label="Remove source file" style={{ background:'none', border:'none', cursor:'pointer', color:'var(--gray-400)', padding:4, borderRadius:5, display:'flex', transition:'color 0.12s' }}
                   onMouseEnter={e=>(e.currentTarget.style.color='#EF4444')}
                   onMouseLeave={e=>(e.currentTarget.style.color='var(--gray-400)')}>
                   <X size={14}/>
                 </button>
               </div>
-                <p style={{ fontSize:11, color:'var(--gray-500)', margin:'-8px 0 14px', lineHeight:1.5 }}>{fileContent.length.toLocaleString()} characters read. Full extracted text is used (up to 100,000 characters). Images are read in your browser and not uploaded. The text is sent to our server and to free AI models when you generate, so do not use private student content.</p>
+                <p role="status" style={{fontSize:12,color:'var(--gray-500)',margin:'-8px 0 14px'}}>{sourceStatus==='reading' ? 'Reading source… Generation is blocked until reading finishes.' : `${fileContent.length.toLocaleString()} characters read.`}</p>
               </>
             )}
 
+            <label htmlFor="source-notes" style={{display:'block',fontSize:13,fontWeight:600,marginBottom:6}}>Source notes · review extracted text or paste your own</label>
+            <textarea id="source-notes" className="input" value={fileContent} disabled={sourceStatus==='reading'||submitting} onChange={e=>{const text=e.target.value;setFileContent(text);setSourceError('');setErrors(previous=>({...previous,source:''}));setSourceStatus(sourceProblem(text)?'error':'ready');}} placeholder="Paste your syllabus or teaching notes here. Include the grade or class when relevant." aria-describedby="source-status" style={{minHeight:150,marginBottom:8,fontSize:13,lineHeight:1.6}} />
+            <p id="source-status" role={(sourceStatus==='error'||sourceError||errors.source)?'alert':'status'} style={{fontSize:12,lineHeight:1.6,marginBottom:14,color:sourceProblem(fileContent)?'#a13f28':'#315846'}}>{sourceStatus==='reading' ? 'Reading source…' : sourceError || errors.source || sourceProblem(fileContent) || `${fileContent.length.toLocaleString()} characters ready. Generation will use this text; check that it matches your notes.`}</p>
+            <p style={{fontSize:11,color:'var(--gray-500)',marginBottom:18}}>Maximum 100,000 characters. Images are read in your browser. Extracted or pasted notes are sent to the generation provider; do not include private student information.</p>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
               <div>
                 <label style={{ fontSize:12, fontWeight:500, color:'var(--gray-700)', display:'block', marginBottom:5 }}>Subject *</label>
@@ -347,8 +344,8 @@ export default function CreatePage() {
 
           <div className="fade-up" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <button className="btn btn-ghost" onClick={()=>router.push('/assignments')}>Previous</button>
-            <button className="btn btn-orange" onClick={handleSubmit} disabled={submitting} style={{ minWidth:130 }}>
-              {submitting?<><Loader2 size={14} className="spin"/> Generating...</>:(versions>1?`Make ${versions} versions →`:'Next →')}
+            <button className="btn btn-orange" onClick={handleSubmit} disabled={submitting || sourceStatus==='reading' || !!sourceProblem(fileContent)} style={{ minWidth:130 }}>
+              {submitting?<><Loader2 size={14} className="spin"/> Generating...</>:(versions>1?`Generate ${versions} papers →`:'Generate paper →')}
             </button>
           </div>
         </div>

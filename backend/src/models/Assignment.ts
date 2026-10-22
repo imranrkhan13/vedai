@@ -19,6 +19,7 @@ export interface IQuestion {
   options?: string[];
   answer?: string;
   concept?: string;
+  evidence?: string;
   markingPoints?: { text: string; marks: number }[];
   rubric?: { marks: number; descriptor: string; example: string }[];
 }

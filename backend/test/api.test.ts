@@ -30,7 +30,13 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
   const j = async (u: string, o?: RequestInit) => { const r = await fetch(base + u, { headers: { 'Content-Type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) }, ...o }); return { status: r.status, body: await r.json() as any }; };
   let n = 0; const ok = (c: unknown, m: string) => { assert.ok(c, m); n++; };
 
-  const body = { title: 'Unit test', subject: 'Science', dueDate: '2026-10-15', questionTypes: ['MCQ', 'Short'], numberOfQuestions: 6, totalMarks: 30, difficulty: 'mixed', clientId: 'c1' };
+  const body = { title: 'Unit test', subject: 'Science', dueDate: '2026-10-15', questionTypes: ['MCQ', 'Short'], numberOfQuestions: 6, totalMarks: 30, difficulty: 'mixed', clientId: 'c1', fileContent: 'Grade 8 science notes: plants use chlorophyll to absorb light for photosynthesis. Newton second law relates force, mass and acceleration.' };
+  for (const source of [undefined,'',' \n\t','!!!']) {
+    const rejected=await j('',{method:'POST',body:JSON.stringify({...body,fileContent:source})});
+    ok(rejected.status===400 && rejected.body.code==='INVALID_SOURCE','unreadable source blocked at API');
+  }
+  ok(jobs.length===0,'empty-source requests never queue work');
+  ok((await j('')).body.data.length===0,'empty-source requests never create assignments');
   let r = await j('', { method: 'POST', body: JSON.stringify(body) });
   ok(r.status === 201 && r.body.success, 'create 201');
   const id = r.body.data.id; ok(id === r.body.data._id && /^[0-9a-f-]{36}$/.test(id), 'id and _id returned');
@@ -83,6 +89,9 @@ stub('services/websocket.ts', { notifyClient: (id: string, p: any) => notices.pu
   ok(r.status === 200 && jobs.length === 2, 'regenerate queues job');
   r = await j('/' + id); ok(r.body.data.status === 'pending' && r.body.data.output === undefined && r.body.data.jobId === '2', 'regenerate reset state');
 
+  await pg.query("UPDATE vedai_assignments SET file_content='' WHERE id=$1",[id]);
+  r=await j(`/${id}/regenerate`,{method:'POST',body:'{}'});
+  ok(r.status===400 && r.body.code==='INVALID_SOURCE' && jobs.length===2,'legacy source-free regeneration is blocked before reset or queue');
   await processAssignmentJob({ id: '9', data: { assignmentId: '00000000-0000-0000-0000-000000000000' }, updateProgress: async () => {} } as any).then(() => assert.fail('should throw'), () => { n++; });
   r = await j('/not-a-uuid'); ok(r.status === 404, 'bad id 404');
   r = await j('/' + id, { method: 'DELETE' }); ok(r.body.success, 'delete ok');

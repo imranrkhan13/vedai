@@ -1,3 +1,4 @@
+import { normalizeSource, sourceProblem } from '../services/sourceText';
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { Assignment } from '../models/Assignment';
@@ -18,7 +19,7 @@ const CreateAssignmentSchema = z.object({
   totalMarks: z.number().min(1).max(500),
   difficulty: z.enum(['easy', 'medium', 'hard', 'mixed']).default('mixed'),
   additionalInstructions: z.string().optional(),
-  fileContent: z.string().max(100000).optional(),
+  fileContent: z.string().transform(normalizeSource).pipe(z.string().max(100000)),
   clientId: z.string().optional(),
 });
 
@@ -43,6 +44,8 @@ router.get('/:id', async (req: Request, res: Response) => {
 
 router.post('/', async (req: Request, res: Response) => {
   try {
+    const sourceError=sourceProblem(req.body?.fileContent);
+    if(sourceError) return res.status(400).json({success:false,code:'INVALID_SOURCE',error:sourceError});
     const parsed = CreateAssignmentSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ success: false, error: 'Validation failed', details: parsed.error.issues });
@@ -78,6 +81,8 @@ router.post('/:id/regenerate', async (req: Request, res: Response) => {
     const assignment = await Assignment.findById(req.params.id as string, req.userId!);
     if (!assignment) return res.status(404).json({ success: false, error: 'Not found' });
 
+    const sourceError=sourceProblem(assignment.fileContent);
+    if(sourceError) return res.status(400).json({success:false,code:'INVALID_SOURCE',error:sourceError});
     const enrolled = await getDb().query('SELECT id FROM vedai_classroom_students WHERE assignment_id=$1 LIMIT 1', [assignment._id]);
     if (enrolled.rows.length) return res.status(409).json({ success: false, error: 'This paper has assigned students. Create a new paper to preserve their submissions.' });
     await Assignment.resetForRegenerate(assignment._id);

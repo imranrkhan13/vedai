@@ -48,3 +48,17 @@ Backend build and all 142 automated assertions pass. Six new provider tests cove
 Backend and frontend production builds pass. Automated tests total 161 assertions, including 16 objective/written grading assertions and three HTTP checks for MCQ submission validation. MCQ grading is deterministic and works without an AI key; invalid choices are rejected before submission is saved. Written grading tests cover explicit multi-mark partial credit and uncertainty flags.
 
 A real local mixed-paper run passed all 63 integration assertions: one MCQ (2 marks), one numerical response (5 marks), and one long answer (8 marks). Complete, partial and incorrect submissions scored 15/15, 3/15 and 0/15. MCQs report `Exact answer check`; written responses used `jev-1.14.0`. The student screen was visually checked with single-choice selection and progress updating from 0/3 to 1/3. Tests demonstrate these cases, not universal grading accuracy; teachers continue to approve final marks.
+
+## Source extraction and empty-source guard — October 22, 2026
+
+Backend suite: **188 assertions passed** (model 18, HTTP/worker 71, classroom 26, grading 12, queue 13, migration 6, provider fallback 9, objective grading 16, source 17). Backend and frontend production builds pass.
+
+- Replaced TXT FileReader handling with awaited ArrayBuffer decoding, supporting UTF-8 and BOM-marked UTF-16. Invalid encodings and failed reads show a blocking error. The exact 656-character Grade 8 fixture was uploaded in the browser: all 656 characters and the full editable preview appeared.
+- Empty, missing, whitespace-only, punctuation-only and oversized sources are blocked before an assignment or generation job is created. Regeneration and the worker also reject source-free legacy assignments. The browser disables generation during reading and when notes are invalid; clearing notes and removing a source were checked manually.
+- PDF extraction now reads all pages within the explicit 100,000-character limit, instead of silently stopping at 20 pages/20,000 characters. This change has not received a new PDF upload browser test.
+- Generation no longer assumes Class 10 or a curriculum. Explicit grade mismatches and missing/nonmatching verbatim source excerpts reject a provider result and trigger fallback. Quotes are an audit aid, not semantic proof that a question is correct or supported.
+- Removed the obsolete statement that student submissions are unsupported.
+
+Focused real-provider local smoke test: assignment `311b98d7-b8ca-4bfe-8ea0-0f3bbd0a09f9`, four questions / six marks, Grade 8 friction and sound, exactly 656 source characters preserved. Three invalid-source requests returned HTTP 400 with no assignments created. All four questions included exact source excerpts; both MCQs had one correct option. Manual agent review found the answers source-supported, but one two-mark written rubric repeated the same idea, and the easy grip recall question was labelled challenging. This is **not teacher acceptance** or evidence of broad paper/grading quality. Teacher review remains necessary before use.
+
+PDF export polish remains open: exports still use image-based html2pdf, and pagination/searchable text need a separate implementation and rendered-PDF test. Photo uploads, 10 versions, provider rate limits and a physical phone were not tested in this slice. Existing synthetic user test records were preserved.
