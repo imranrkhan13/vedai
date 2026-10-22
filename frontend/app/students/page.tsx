@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
+import '../classroom.css';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/ui/Topbar';
@@ -13,6 +14,7 @@ type Row = { id: string; studentId: string; name: string; submitted: boolean; su
 export default function StudentsPage() {
   const [confirm, confirmNode] = useConfirm();
   const router = useRouter();
+  const reviewRef=useRef<HTMLDivElement>(null);
   const [aid, setAid] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
   const [max, setMax] = useState(0);
@@ -51,6 +53,27 @@ export default function StudentsPage() {
       setMk(m);
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Failed'); }
   };
+  useEffect(()=>{ if(detail) reviewRef.current?.scrollIntoView({behavior:'smooth',block:'start'}); },[detail?.student?.id]);
+  const useSuggestions = () => {
+    const next = {...mk};
+    for (const q of detail.questions) { const draft=detail.aiDrafts?.[q.id]; if (draft && !draft.requiresReview) next[q.id]={marks:String(draft.marks),reason:draft.reason}; }
+    setMk(next); toast.success('Suggestions added. Review the marks, then save.');
+  };
+  const saveAll = async () => {
+    if (busy) return;
+    if (detail.questions.some((q:any)=>!mk[q.id] || mk[q.id].marks==='' || !Number.isInteger(Number(mk[q.id].marks)) || Number(mk[q.id].marks)<0 || Number(mk[q.id].marks)>q.marks)) { toast.error('Enter a valid mark for every question first.'); return; }
+    setBusy(true);
+    try { for (const q of detail.questions) await api.rosterMark(aid,open,q.id,Number(mk[q.id].marks),mk[q.id].reason); setDetail(await api.rosterSubmission(aid,open)); await load(aid); toast.success('All marks saved. You can now share results.'); }
+    catch(e) { toast.error(e instanceof Error ? e.message : 'Could not save all marks'); }
+    finally { setBusy(false); }
+  };
+  const displayAnswer = (q:any) => {
+    const answer=detail.answers[q.id] || '';
+    if (!q.options?.length || !answer) return answer || 'No answer submitted';
+    const token=answer.match(/^option:(\d+)$/), letter=answer.match(/^\(?([a-z])\)?[.)]?$/i);
+    const index=token?Number(token[1]):letter?letter[1].toLowerCase().charCodeAt(0)-97:q.options.indexOf(answer);
+    return q.options[index] ? `${String.fromCharCode(65+index)}. ${q.options[index]}` : answer;
+  };
   const saveMark = async (q: any) => {
     const v = mk[q.id]; const n = Number(v.marks);
     if (v.marks === '' || !Number.isInteger(n) || n < 0 || n > q.marks) { toast.error(`Marks must be a whole number from 0 to ${q.marks}`); return; }
@@ -61,24 +84,22 @@ export default function StudentsPage() {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
+    <div className="classroom" style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
       {confirmNode}
       <Sidebar />
       <main className="main-content" style={{ marginLeft: 248, flex: 1, minWidth: 0 }}>
         <Topbar>
           <button className="btn btn-ghost btn-sm" onClick={() => router.push(aid ? `/output/${aid}` : '/assignments')} style={{ gap: 6 }}><ArrowLeft size={14} /> Back</button>
         </Topbar>
-        <div style={{ padding: '20px 28px 60px', maxWidth: 820 }}>
-          <h1 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>Students and submissions</h1>
-          <p style={{ fontSize: 12, color: 'var(--gray-500)', lineHeight: 1.6, marginBottom: 14 }}>
-            Assign a unique student ID and pass on the private access code. Students submit typed answers; AI drafts per-question scores and explanations for your review. Save final marks and share results when ready.
-
-          </p>
+        <div style={{ padding: '28px 24px 60px', maxWidth: 1000 }}>
+          <p className="eyebrow">Teacher workspace</p><h1 className="hero-title">Your classroom, at a glance.</h1>
+          <p className="muted">Add students, review their answers, and share results when you’re ready.</p>
+          <div className="summary-grid"><div><strong>{rows.length}</strong><span>Students assigned</span></div><div><strong>{rows.filter(r=>r.submitted).length}</strong><span>Answers submitted</span></div><div><strong>{rows.filter(r=>r.released).length}</strong><span>Results shared</span></div></div>
           {!aid && !loading && <p style={{ fontSize: 13 }}>Open this page from an assignment.</p>}
           {aid && (
             <form onSubmit={add} className="card" style={{ padding: '14px 20px', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 14 }}>
-              <div style={{ flex: '1 1 140px' }}><label style={{ fontSize: 12, fontWeight: 600 }}>Student ID</label><input className="input" required value={sid} onChange={e => setSid(e.target.value)} placeholder="e.g. 7B-014" style={{ marginTop: 4 }} /></div>
-              <div style={{ flex: '1 1 140px' }}><label style={{ fontSize: 12, fontWeight: 600 }}>Name (optional)</label><input className="input" value={name} onChange={e => setName(e.target.value)} maxLength={60} style={{ marginTop: 4 }} /></div>
+              <div style={{ flex: '1 1 140px' }}><label htmlFor="roster-id" style={{ fontSize: 12, fontWeight: 600 }}>Student ID</label><input id="roster-id" className="input" required value={sid} onChange={e => setSid(e.target.value)} placeholder="e.g. 7B-014" style={{ marginTop: 4 }} /></div>
+              <div style={{ flex: '1 1 140px' }}><label htmlFor="roster-name" style={{ fontSize: 12, fontWeight: 600 }}>Name (optional)</label><input id="roster-name" className="input" value={name} onChange={e => setName(e.target.value)} maxLength={60} style={{ marginTop: 4 }} /></div>
               <button className="btn btn-primary" type="submit" disabled={busy}>{busy ? 'Adding...' : 'Add student'}</button>
             </form>
           )}
@@ -102,9 +123,10 @@ export default function StudentsPage() {
               <button className="btn btn-ghost btn-sm" onClick={() => remove(r)}>Remove</button>
             </div>
           ))}
+          {open && !detail && <p role="status" className="muted">Opening submission…</p>}
           {open && detail && (
-            <div className="card" style={{ padding: '16px 20px', marginTop: 14 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Review: {detail.student.studentId}</h3>
+            <div ref={reviewRef} className="card" style={{ padding: '24px', marginTop: 24, scrollMarginTop:20 }}>
+              <p className="eyebrow">Submission review</p><h2 style={{fontSize:24,letterSpacing:"-.03em",margin:"6px 0"}}>{detail.student.name || detail.student.studentId}</h2><p className="muted">MCQs use the answer key. Written responses are checked against marking criteria.</p><div className="review-tools"><button className="btn btn-ghost btn-sm" onClick={useSuggestions}>Use confident suggestions</button><button className="btn btn-primary btn-sm" disabled={busy} onClick={saveAll}>{busy ? 'Saving…' : 'Save all marks'}</button></div>
               <button className="btn btn-ghost btn-sm" onClick={() => view({ id: open } as Row)}>Refresh review</button>
               {detail.gradingError && <p role="status" style={{ color: '#b45309', fontSize: 12 }}>{detail.gradingError}</p>}
               <button className="btn btn-ghost btn-sm" disabled={busy} style={{ margin: '10px 0' }} onClick={async () => { setBusy(true); try { await api.rosterGrade(aid, open); await view({ id: open } as Row); toast.success('Grading queued. Refresh the review shortly.'); } catch (e) { toast.error(e instanceof Error ? e.message : 'Grading failed'); } finally { setBusy(false); } }}>{busy ? 'Grading…' : 'Generate / retry AI grading'}</button>
@@ -113,20 +135,18 @@ export default function StudentsPage() {
               {detail.questions.map((q: any, qi: number) => (
                 <div key={q.id} style={{ borderTop: qi ? '1px solid var(--border)' : 'none', paddingTop: qi ? 12 : 0, marginTop: qi ? 12 : 0 }}>
                   <p style={{ fontSize: 13, fontWeight: 600 }}>{q.number}. {q.text} <span style={{ color: 'var(--gray-500)', fontWeight: 500 }}>[max {q.marks}]</span></p>
-                  <p style={{ fontSize: 13, whiteSpace: 'pre-wrap', margin: '6px 0', padding: '8px 10px', background: 'var(--gray-50)', borderRadius: 8 }}>{detail.answers[q.id] || '(no answer)'}</p>
-                  {detail.aiDrafts?.[q.id] && (() => { const dr = detail.aiDrafts[q.id]; return <div style={{ background: '#eef5ed', borderRadius: 10, padding: 14, margin: '10px 0', fontSize: 13 }}>
-                    <b>AI suggested score: {dr.marks} / {q.marks}</b>
-                    <p style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>{dr.reason}</p>
-                    {dr.covered?.length > 0 && <p style={{ marginTop: 6 }}><b>Covered:</b> {dr.covered.join('; ')}</p>}
-                    {dr.missing?.length > 0 && <p style={{ marginTop: 6 }}><b>Missing / deductions:</b> {dr.missing.join('; ')}</p>}
-                    {dr.uncertain?.length > 0 && <p style={{ marginTop: 6 }}><b>Needs teacher review:</b> {dr.uncertain.join('; ')}</p>}
-                    <p style={{ marginTop: 6, fontSize: 11 }}>{dr.explanationSource}</p>
-                    <p style={{ marginTop: 6, color: 'var(--gray-500)', fontSize: 11 }}>Model: {dr.model}. Review this draft before saving final marks.</p>
-                    <button className="btn btn-sm" style={{ marginTop: 10 }} onClick={() => setMk({ ...mk, [q.id]: { marks: String(dr.marks), reason: dr.reason } })}>Use suggested score and explanation</button>
+                  <p className="eyebrow" style={{marginTop:12}}>Student answer</p><p className="student-answer">{displayAnswer(q)}</p>
+                  {detail.aiDrafts?.[q.id] && (() => { const dr=detail.aiDrafts[q.id]; return <div className="grade-suggestion">
+                    <div className="question-top" style={{marginBottom:6}}><b style={{fontSize:18}}>{dr.marks} / {q.marks}</b><span className="status-pill">{dr.gradingMethod==='exact' ? 'Answer key checked' : dr.requiresReview ? 'Needs your review' : 'Jev suggestion'}</span></div>
+                    <p className="muted">{dr.gradingMethod==='exact' ? dr.reason : `${dr.covered?.length || 0} criteria met${dr.partial?.length ? ` · ${dr.partial.length} partly met` : ''}${dr.uncertain?.length ? ` · ${dr.uncertain.length} need review` : ''}. Review the evidence before saving.`}</p>
+                    <details><summary>Why these marks?</summary>{dr.evidence?.length ? <ul style={{paddingLeft:18,fontSize:13,lineHeight:1.8,marginTop:10}}>{dr.evidence.map((point:any,index:number)=><li key={index}><b>{point.awarded} / {point.marks}</b> — {point.text} ({point.status}{point.needsReview ? ', check this point' : ''})</li>)}</ul> : <p style={{fontSize:13,marginTop:8}}>{dr.reason}</p>}<p className="muted" style={{fontSize:11,marginTop:8}}>{dr.explanationSource} · {dr.model}</p></details>
+                    <button className="btn btn-ghost btn-sm" style={{marginTop:12}} onClick={()=>setMk({...mk,[q.id]:{marks:String(dr.marks),reason:dr.reason}})}>Use this suggestion</button>
                   </div>; })()}
                   {detail.preview?.[q.id] && <p style={{ fontSize: 12, margin: '6px 0', padding: '6px 8px', background: 'var(--gray-50)', borderRadius: 6 }}><b>{detail.released ? 'What the student sees now' : 'What the student will see once you share'} ({detail.student.ageGroup === 'adult' ? '18 or over wording' : detail.student.ageGroup === 'under18' ? 'under 18 wording' : 'age group not set, simple wording'}), from your saved marks:</b> {detail.preview[q.id].text}</p>}
+                  <details style={{margin:"12px 0"}}><summary className="muted" style={{cursor:"pointer"}}>Reference answer & marking guide</summary>
                   {q.answer && <p style={{ fontSize: 11, color: 'var(--gray-500)' }}>Answer key (AI draft): {q.answer}</p>}
                   {q.rubric?.length === 3 && <p style={{ fontSize: 11, color: 'var(--gray-500)' }}>Levels (AI draft): {q.rubric.map((l: any) => `${l.marks}: ${l.descriptor}`).join(' | ')}</p>}
+                  </details>
                   <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
                     <input className="input" type="number" min={0} max={q.marks} value={mk[q.id]?.marks ?? ''} onChange={e => setMk({ ...mk, [q.id]: { ...mk[q.id], marks: e.target.value } })} style={{ width: 70, height: 34, fontSize: 13 }} aria-label={`Marks for question ${q.number}`} />
                     <input className="input" value={mk[q.id]?.reason ?? ''} maxLength={2000} placeholder="Explain the awarded marks" onChange={e => setMk({ ...mk, [q.id]: { ...mk[q.id], reason: e.target.value } })} style={{ flex: '1 1 200px', height: 34, fontSize: 13 }} aria-label={`Comment for question ${q.number}`} />

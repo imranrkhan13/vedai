@@ -1,3 +1,4 @@
+import { isMCQ, selectedChoice } from '../services/answerTypes';
 import { Router, Request, Response, NextFunction } from 'express';
 import crypto from 'node:crypto';
 import { z } from 'zod';
@@ -107,6 +108,7 @@ studentRoutes.post('/submit', wrap(async (req,res) => {
  const s=await student(req); if (!s) return fail(res,401,'Please sign in'); const a=await Assignment.findById(s.assignment_id); if (!a || a.status !== 'completed') return fail(res,409,'Paper is not available');
  const p=z.record(z.string().max(5000)).safeParse(req.body.answers); if (!p.success) return fail(res,400,'Answers must be text, up to 5,000 characters per question');
  const qs=questions(a); if (Object.keys(p.data).some(id=>!qs.some(q=>q.id===id))) return fail(res,400,'Unknown question');
+ for (const q of qs) if (isMCQ(q) && p.data[q.id]?.trim() && selectedChoice(q,p.data[q.id]) < 0) return fail(res,400,'Choose one of the listed options for each multiple-choice question');
  const r=await getDb().query('UPDATE vedai_classroom_students SET answers=$2::jsonb,submitted_at=now() WHERE id=$1 AND submitted_at IS NULL RETURNING submitted_at',[s.id,JSON.stringify(p.data)]);
  if (!r.rows[0]) return fail(res,409,'Answers already submitted');
  // Persist first, then enqueue durable grading so long papers never block submission.

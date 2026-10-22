@@ -7,8 +7,8 @@ import { IQuestion } from '../src/models/Assignment';
  try {
  delete process.env.TYPESAFE_API_KEY; await assert.rejects(gradeAnswers([q],{q:'A'}),/not configured/);
  process.env.TYPESAFE_API_KEY='test-key';
- global.fetch=(async (_url,options)=>{const body=JSON.parse(String(options?.body));assert.equal(body.model,'jev-latest');assert.equal(body.state.studentAnswer,'A');assert.equal(body.questions.point_1.type,'noul');return new Response(JSON.stringify({model:'jev-test',answers:{point_0:{type:'noul',noul:0.9},point_1:{type:'noul',noul:0.5}}}));}) as typeof fetch;
- const g:any = await gradeAnswers([q],{q:'A'});assert.equal(g.q.marks,2);assert.deepEqual(g.q.uncertain,['B']);assert.match(g.q.reason,/Withheld 3 marks/);assert.match(g.q.explanationSource,/App summary/);
+ global.fetch=(async (_url,options)=>{const body=JSON.parse(String(options?.body));assert.equal(body.model,'jev-latest');assert.equal(body.state.studentAnswer,'A');assert.equal(body.questions.point_1.type,'noul');return new Response(JSON.stringify({model:'jev-test',answers:{point_0:{type:'noul',noul:0.9},point_1:{type:'noul',noul:0.5},partial_1:{type:'noul',noul:0.5}}}));}) as typeof fetch;
+ const g:any = await gradeAnswers([q],{q:'A'});assert.equal(g.q.marks,2);assert.deepEqual(g.q.uncertain,['B']);assert.match(g.q.reason,/0\/3/);assert.match(g.q.explanationSource,/App summary/);
  global.fetch=(async ()=>new Response(JSON.stringify({model:'jev-test',answers:{point_0:{type:'noul',noul:2}}}))) as typeof fetch;await assert.rejects(gradeAnswers([q],{q:'A'}));
  global.fetch=(async ()=>new Response(JSON.stringify({model:'jev-test',answers:{point_0:{type:'noul',noul:0.9}}}))) as typeof fetch;await assert.rejects(gradeAnswers([q],{q:'A'}),/incomplete/);
  global.fetch=(async ()=>new Response('{}',{status:429})) as typeof fetch;await assert.rejects(gradeAnswers([q],{q:'A'}),/unavailable/);

@@ -42,3 +42,9 @@ The earlier Redis-quota assignment failure is resolved. Queue tests cover dedupl
 Verified live synthetic requests using the existing primary Groq credential (`openai/gpt-oss-120b`) and Gemini credential (`gemini-3.5-flash-lite`): both returned HTTP 200 and content. The deployed allowlist was found to enable only OpenRouter, preventing the other configured providers from being attempted.
 
 Backend build and all 142 automated assertions pass. Six new provider tests cover primary-key precedence, secondary-key recovery, provider fallback after invalid generated JSON, exhausted-provider diagnostics and allowlist enforcement. The supplied secondary Groq key remains in ignored local/server configuration, not source control. This update concerns question generation; student grading continues to use the separately configured Jev integration.
+
+## Objective and written grading update — October 22, 2026
+
+Backend and frontend production builds pass. Automated tests total 161 assertions, including 16 objective/written grading assertions and three HTTP checks for MCQ submission validation. MCQ grading is deterministic and works without an AI key; invalid choices are rejected before submission is saved. Written grading tests cover explicit multi-mark partial credit and uncertainty flags.
+
+A real local mixed-paper run passed all 63 integration assertions: one MCQ (2 marks), one numerical response (5 marks), and one long answer (8 marks). Complete, partial and incorrect submissions scored 15/15, 3/15 and 0/15. MCQs report `Exact answer check`; written responses used `jev-1.14.0`. The student screen was visually checked with single-choice selection and progress updating from 0/3 to 1/3. Tests demonstrate these cases, not universal grading accuracy; teachers continue to approve final marks.

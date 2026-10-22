@@ -1,3 +1,4 @@
+import { isMCQ } from './answerTypes';
 import { stripNul, IAssignment, IGeneratedOutput, ISection, IQuestion } from '../models/Assignment';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -21,8 +22,10 @@ RULES:
 - Total questions across ALL sections must equal exactly ${a.numberOfQuestions}
 - Questions must be specific, academically rigorous, and about ${a.subject}
 - Each question must have: text, difficulty (easy|medium|hard), marks (number), type (string), concept (2-4 words naming the single fact or skill it tests; every question needs a different concept), answer (the correct answer or a short model answer)
+- For written answers, prefer one independently assessable fact or step per mark, with concrete criteria for reasoning, examples or calculations when the question asks for them.
 - Every question must include "markingPoints": an array of independent assessable facts/steps {"text": "specific expected fact", "marks": integer}. Their marks must sum exactly to the question marks. Use these to explain credit and deductions.
 - Questions worth 3 or more marks should include "rubric": three {"marks": integer, "descriptor": "concrete assessment level", "example": "sample answer"} entries.
+- Every MCQ must have exactly ONE unambiguously correct option; all distractors must be incorrect. Never include synonymous answers, equivalent formulas or rearranged equations as separate options.
 - Every MCQ question MUST also have an "options" array of exactly 4 distinct answer choices (plain text, no A/B/C/D prefixes), and its "answer" must be exactly one of those options
 - Every question must test a different fact or skill; never ask about the same fact twice, even in different words
 - Use ONLY these question types, and use each at least once: ${a.questionTypes.join(', ')}. Set each question's "type" to the matching label (MCQ, Short, Long, Diagram, Numerical, True/False, Fill, Essay)
@@ -186,6 +189,7 @@ async function callWithFallback(prompt: string, assignment: IAssignment): Promis
       console.log(`[AI] Trying ${p.name}...`);
       const result = await p.fn(prompt);
       const paper = parseResponse(result, assignment);
+      if (paper.sections.flatMap(section=>section.questions).some(q=>!q.answer || !isMCQ(q) && !q.markingPoints?.length)) throw new Error('Generated paper is missing an answer key or written marking criteria');
       console.log(`[AI] ✅ ${p.name} succeeded`);
       return paper;
     } catch (err: any) {
