@@ -47,3 +47,9 @@ The frontend currently has existing lint failures in several older components (u
 Jobs persist in `vedai_jobs`. Workers claim due jobs atomically using `FOR UPDATE SKIP LOCKED`, renew a ten-minute lease, and retry failures up to `QUEUE_ATTEMPTS` (default 3). Expired leases can be reclaimed after a worker restart. Active grading jobs are deduplicated by student row. No Redis service or credential is required. Completed papers are read directly from PostgreSQL. In-process WebSockets provide immediate updates; browser polling reads persisted status when a separate worker runs.
 
 A one-time migration copies existing student access codes, submissions and final marks into `vedai_classroom_students`. Original tables are retained. Existing students can sign in with their original ID and access code.
+
+## Free-tier question generation
+
+Set `AI_PROVIDER_ALLOWLIST=groq,gemini,openrouter` to exclude Mistral and Cohere from automatic generation. Use free-plan accounts for Groq and Gemini; those APIs also support paid accounts, so model selection alone does not enforce free billing. OpenRouter routing continues to reject models without the `:free` suffix.
+
+Groq tries `GROQ_API_KEY` (or the legacy `GROK_API_KEY`) first, and `GROQ_API_KEY_FALLBACK` only when that request fails. Keys from one organization share rate limits. Gemini defaults to `gemini-3.5-flash-lite`. All provider requests have a 45-second timeout. Invalid JSON or papers that fail question/mark validation advance to the next enabled provider. If none succeeds, the assignment records the provider errors instead of a generic failure.

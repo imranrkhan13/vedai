@@ -36,3 +36,9 @@ October 12, 2026: replaced Redis caching/pub-sub and BullMQ with a durable Postg
 - Production test assignment: `d1191aa2-bae1-48ba-9e8a-2037f223aa21`.
 
 The earlier Redis-quota assignment failure is resolved. Queue tests cover deduplication, claim exclusion, retry delay, persisted attempts/progress, expired lease recovery, stale-worker completion protection, regrading and exhausted retries. Workers renew leases while running; separate workers are visible to the browser through polling.
+
+## Provider reliability update — October 22, 2026
+
+Verified live synthetic requests using the existing primary Groq credential (`openai/gpt-oss-120b`) and Gemini credential (`gemini-3.5-flash-lite`): both returned HTTP 200 and content. The deployed allowlist was found to enable only OpenRouter, preventing the other configured providers from being attempted.
+
+Backend build and all 142 automated assertions pass. Six new provider tests cover primary-key precedence, secondary-key recovery, provider fallback after invalid generated JSON, exhausted-provider diagnostics and allowlist enforcement. The supplied secondary Groq key remains in ignored local/server configuration, not source control. This update concerns question generation; student grading continues to use the separately configured Jev integration.

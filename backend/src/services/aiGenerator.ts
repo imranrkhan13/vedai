@@ -54,8 +54,8 @@ async function tryGemini(prompt: string): Promise<string> {
   const key = process.env.GEMINI_API_KEY;
   if (!key || key.includes('your_')) throw new Error('No Gemini key');
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL || 'gemini-flash-latest'}:generateContent?key=${key}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    `https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'}:generateContent?key=${key}`,
+    { method: 'POST', signal: AbortSignal.timeout(45000), headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4, maxOutputTokens: 4096 } }) }
   );
   if (!res.ok) throw new Error(`Gemini ${res.status}`);
@@ -89,7 +89,7 @@ async function tryOpenRouter(prompt: string): Promise<string> {
   let lastErr = 'OpenRouter: no model tried';
   for (const model of models) {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
+      method: 'POST', signal: AbortSignal.timeout(45000),
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'HTTP-Referer': 'https://vedaai.app', 'X-Title': 'VedaAI' },
       body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 8192, temperature: 0.4 }),
     });
@@ -110,25 +110,31 @@ async function tryOpenRouter(prompt: string): Promise<string> {
 }
 
 async function tryGroq(prompt: string): Promise<string> {
-  const key = process.env.GROQ_API_KEY || process.env.GROK_API_KEY;
-  if (!key || key.includes('your_')) throw new Error('No Groq key');
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-    body: JSON.stringify({ model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b', messages: [{ role: 'user', content: prompt }], max_tokens: 4096, temperature: 0.4 }),
-  });
-  if (!res.ok) throw new Error(`Groq ${res.status}`);
-  const data = await res.json() as any;
-  const text = data?.choices?.[0]?.message?.content;
-  if (!text) throw new Error('Groq: empty');
-  return text;
+  const keys = [...new Set([process.env.GROQ_API_KEY || process.env.GROK_API_KEY, process.env.GROQ_API_KEY_FALLBACK].filter((key): key is string => !!key && !key.includes('your_')))];
+  if (!keys.length) throw new Error('No Groq key');
+  let failure = 'Groq request failed';
+  for (const key of keys) {
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST', signal: AbortSignal.timeout(45000),
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+        body: JSON.stringify({ model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b', messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' }, max_tokens: 4096, temperature: 0.4 }),
+      });
+      if (!res.ok) throw new Error(`Groq ${res.status}`);
+      const data = await res.json() as any;
+      const text = data?.choices?.[0]?.message?.content;
+      if (!text) throw new Error('Groq: empty');
+      return text;
+    } catch (err) { failure = redactError(err instanceof Error ? err.message : String(err), key); }
+  }
+  throw new Error(failure);
 }
 
 async function tryMistral(prompt: string): Promise<string> {
   const key = process.env.MISTRAL_API_KEY;
   if (!key || key.includes('your_')) throw new Error('No Mistral key');
   const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
-    method: 'POST',
+    method: 'POST', signal: AbortSignal.timeout(45000),
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
     body: JSON.stringify({ model: 'mistral-small-latest', messages: [{ role: 'user', content: prompt }], max_tokens: 4096, temperature: 0.4 }),
   });
@@ -143,7 +149,7 @@ async function tryCohere(prompt: string): Promise<string> {
   const key = process.env.COHERE_API_KEY;
   if (!key || key.includes('your_')) throw new Error('No Cohere key');
   const res = await fetch('https://api.cohere.com/v2/chat', {
-    method: 'POST',
+    method: 'POST', signal: AbortSignal.timeout(45000),
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
     body: JSON.stringify({ model: process.env.COHERE_MODEL || 'command-r-plus-08-2024', messages: [{ role: 'user', content: prompt }], max_tokens: 4096, temperature: 0.4 }),
   });
@@ -173,18 +179,22 @@ export function allowedProviders<T extends { name: string }>(list: T[], env: Nod
 
 export function activeProviders() { return allowedProviders(PROVIDERS); }
 
-async function callWithFallback(prompt: string): Promise<string | null> {
+async function callWithFallback(prompt: string, assignment: IAssignment): Promise<IGeneratedOutput> {
+  const failures: string[] = [];
   for (const p of activeProviders()) {
     try {
       console.log(`[AI] Trying ${p.name}...`);
       const result = await p.fn(prompt);
+      const paper = parseResponse(result, assignment);
       console.log(`[AI] ✅ ${p.name} succeeded`);
-      return result;
+      return paper;
     } catch (err: any) {
-      console.warn(`[AI] ❌ ${p.name}: ${err?.message}`);
+      const message = redactError(String(err?.message || err));
+      failures.push(`${p.name}: ${message}`);
+      console.warn(`[AI] ❌ ${p.name}: ${message}`);
     }
   }
-  return null; // all failed → use high-quality mock
+  throw new Error(`All AI providers failed: ${failures.join('; ') || 'No providers enabled; check AI_PROVIDER_ALLOWLIST'}`);
 }
 
 // ── Parse LLM response ──────────────────────────────────────────────────────
@@ -500,17 +510,9 @@ function buildMockOutput(a: IAssignment): IGeneratedOutput {
 // ── Public entry point ────────────────────────────────────────────────────────
 export async function generateQuestionPaper(a: IAssignment): Promise<IGeneratedOutput> {
   const prompt = buildPrompt(a);
-  const raw = await callWithFallback(prompt);
-
-  let rejected = '';
-  if (raw) {
-    try {
-      return parseResponse(raw, a);
-    } catch (parseErr) {
-      rejected = parseErr instanceof Error ? parseErr.message : String(parseErr);
-      console.warn('[AI] Generated paper rejected:', rejected);
-    }
-  }
+  let failure: unknown;
+  try { return await callWithFallback(prompt, a); }
+  catch (err) { failure = err; }
 
   // Fail honestly by default. Demo mode (ALLOW_MOCK_OUTPUT=true) keeps the old sample paper,
   // clearly labelled so it cannot be mistaken for AI output.
@@ -519,5 +521,5 @@ export async function generateQuestionPaper(a: IAssignment): Promise<IGeneratedO
     const mock = buildMockOutput(a);
     return { ...mock, schoolName: 'SAMPLE PAPER (not AI-generated)' };
   }
-  throw new Error(rejected ? `Generated paper rejected: ${rejected}` : 'All AI providers failed or are not configured');
+  throw failure;
 }
