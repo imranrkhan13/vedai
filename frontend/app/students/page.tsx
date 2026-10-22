@@ -56,7 +56,7 @@ export default function StudentsPage() {
   useEffect(()=>{ if(detail) reviewRef.current?.scrollIntoView({behavior:'smooth',block:'start'}); },[detail?.student?.id]);
   const useSuggestions = () => {
     const next = {...mk};
-    for (const q of detail.questions) { const draft=detail.aiDrafts?.[q.id]; if (draft && !draft.requiresReview) next[q.id]={marks:String(draft.marks),reason:draft.reason}; }
+    for (const q of detail.questions) { const draft=detail.aiDrafts?.[q.id]; if (draft && !draft.requiresReview && !draft.uncertain?.length) next[q.id]={marks:String(draft.marks),reason:draft.reason}; }
     setMk(next); toast.success('Suggestions added. Review the marks, then save.');
   };
   const saveAll = async () => {
@@ -137,7 +137,7 @@ export default function StudentsPage() {
                   <p style={{ fontSize: 13, fontWeight: 600 }}>{q.number}. {q.text} <span style={{ color: 'var(--gray-500)', fontWeight: 500 }}>[max {q.marks}]</span></p>
                   <p className="eyebrow" style={{marginTop:12}}>Student answer</p><p className="student-answer">{displayAnswer(q)}</p>
                   {detail.aiDrafts?.[q.id] && (() => { const dr=detail.aiDrafts[q.id]; return <div className="grade-suggestion">
-                    <div className="question-top" style={{marginBottom:6}}><b style={{fontSize:18}}>{dr.marks} / {q.marks}</b><span className="status-pill">{dr.gradingMethod==='exact' ? 'Answer key checked' : dr.requiresReview ? 'Needs your review' : 'Jev suggestion'}</span></div>
+                    <div className="question-top" style={{marginBottom:6}}><b style={{fontSize:18}}>{dr.marks} / {q.marks}</b><span className="status-pill">{dr.gradingMethod==='exact' ? 'Answer key checked' : (dr.requiresReview || dr.uncertain?.length) ? 'Needs your review' : 'Jev suggestion'}</span></div>
                     <p className="muted">{dr.gradingMethod==='exact' ? dr.reason : `${dr.covered?.length || 0} criteria met${dr.partial?.length ? ` · ${dr.partial.length} partly met` : ''}${dr.uncertain?.length ? ` · ${dr.uncertain.length} need review` : ''}. Review the evidence before saving.`}</p>
                     <details><summary>Why these marks?</summary>{dr.evidence?.length ? <ul style={{paddingLeft:18,fontSize:13,lineHeight:1.8,marginTop:10}}>{dr.evidence.map((point:any,index:number)=><li key={index}><b>{point.awarded} / {point.marks}</b> — {point.text} ({point.status}{point.needsReview ? ', check this point' : ''})</li>)}</ul> : <p style={{fontSize:13,marginTop:8}}>{dr.reason}</p>}<p className="muted" style={{fontSize:11,marginTop:8}}>{dr.explanationSource} · {dr.model}</p></details>
                     <button className="btn btn-ghost btn-sm" style={{marginTop:12}} onClick={()=>setMk({...mk,[q.id]:{marks:String(dr.marks),reason:dr.reason}})}>Use this suggestion</button>

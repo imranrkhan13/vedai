@@ -50,7 +50,7 @@ export default function StudentPage() {
         <label htmlFor="student-code" style={{ fontSize: 12, fontWeight: 600 }}>Access code</label>
         <input id="student-code" className="input" type="password" required autoComplete="current-password" value={code} onChange={e => setCode(e.target.value)} placeholder="Your teacher’s private code" style={{ marginTop: 4 }} />
         <button className="btn btn-primary" type="submit" disabled={busy} style={{ width: '100%', marginTop: 18, justifyContent: 'center' }}>{busy ? 'Please wait...' : 'Sign in'}</button>
-        <p style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 14, lineHeight: 1.5 }}>Your answers are saved and sent to an AI grading service to suggest scores and feedback. Your teacher reviews and shares the final marks.</p>
+        <p style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 14, lineHeight: 1.5 }}>MCQs are checked against the answer key. Written answers are sent to Jev for suggested marks and feedback. Your teacher reviews and shares the final results.</p>
       </form>
     </div>
   );
