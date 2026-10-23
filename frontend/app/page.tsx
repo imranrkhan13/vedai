@@ -1,7 +1,10 @@
 import Link from 'next/link';
-import { ArrowRight, ArrowUpRight, BookOpen, Check, FileCheck2, FileText, GraduationCap, LockKeyhole, MessageSquareText, Users, Download, ChevronDown } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, BookOpen, Check, FileCheck2, FileText, GraduationCap, LockKeyhole, MessageSquareText, Users, Download, ChevronDown, Clock, ShieldCheck, Layers } from 'lucide-react';
 import AssessmentPreview from '@/components/landing/AssessmentPreview';
 import './landing.css';
+
+// Free hosted screenshot of a public page (WordPress mShots). Nothing is stored in this project.
+const shot = (url: string, w = 900, h = 620) => `https://s0.wp.com/mshots/v1/${encodeURIComponent(url)}?w=${w}&h=${h}`;
 
 const steps = [
     { icon: BookOpen, title: 'Bring your class notes', text: 'Upload a TXT or text-based PDF, or paste your syllabus. Read the extracted text and fix anything that needs changing.', detail: 'No readable notes? Generation stays blocked.' },
@@ -12,9 +15,21 @@ const steps = [
     { icon: GraduationCap, title: 'Review, save, then share', text: 'MCQs use the answer key. Jev drafts written-answer marks and explanations. Check the work, enter final marks and save them before sharing.', detail: 'Students see results only when you release them.' },
 ];
 const sources = [
-    { platform: 'LinkedIn', type: 'Public post', title: 'Grading follows teachers home.', text: 'Preparing questions and marking answers can follow teachers into evenings and weekends.', response: 'Keep notes, papers, submissions and results together in one workflow.', image: '/research/linkedin-workload.jpg', alt: 'Cropped public LinkedIn post by Dr Sunita Gandhi discussing grading outside school hours', url: 'https://www.linkedin.com/posts/dr-sunita-gandhi_education-activity-7458412898407600128-otfi' },
-    { platform: 'Hacker News', type: 'Community discussion', title: 'A clear mark needs a clear reason.', text: 'A score alone does not show which points a student understood or missed.', response: 'Review the suggested mark alongside specific marking points and an explanation.', image: '/research/hacker-news-consistency.jpg', alt: 'Excerpt of a Hacker News discussion about grading consistency', url: 'https://news.ycombinator.com/item?id=40097375' },
-    { platform: 'EdSurge', type: 'Educator opinion', title: 'Teachers need to own the feedback.', text: 'AI feedback can sound convincing while missing important gaps in an answer.', response: 'Teachers check the work, save final marks and choose when to release results.', image: '/research/edsurge-teacher-review.jpg', alt: 'EdSurge opinion article by Steven Swanson on keeping teachers in charge of AI grading', url: 'https://www.edsurge.com/news/i-built-an-ai-grading-tool-then-a-student-thanked-me-for-words-i-didnt-write' },
+    { platform: 'LinkedIn', type: 'Public post', title: 'Grading follows teachers home.', text: 'Preparing questions and marking answers can follow teachers into evenings and weekends.', response: 'Keep notes, papers, submissions and results together in one workflow.', alt: 'Public LinkedIn post by Dr Sunita Gandhi discussing grading outside school hours', url: 'https://www.linkedin.com/posts/dr-sunita-gandhi_education-activity-7458412898407600128-otfi' },
+    { platform: 'Hacker News', type: 'Community discussion', title: 'A clear mark needs a clear reason.', text: 'A score alone does not show which points a student understood or missed.', response: 'Review the suggested mark alongside specific marking points and an explanation.', alt: 'Hacker News discussion about grading consistency', url: 'https://news.ycombinator.com/item?id=40097375' },
+    { platform: 'EdSurge', type: 'Educator opinion', title: 'Teachers need to own the feedback.', text: 'AI feedback can sound convincing while missing important gaps in an answer.', response: 'Teachers check the work, save final marks and choose when to release results.', alt: 'EdSurge opinion article by Steven Swanson on keeping teachers in charge of AI grading', url: 'https://www.edsurge.com/news/i-built-an-ai-grading-tool-then-a-student-thanked-me-for-words-i-didnt-write' },
+];
+const stats = [
+    { value: '9.9 hrs', label: 'a week spent grading by US teachers, and 95% take it home', source: 'Learnosity teacher survey', url: 'https://learnosity.com/resources/edtech-blog/a-third-of-us-teachers-considered-leaving-education-in-last-12-months-due-to-grading-workload/' },
+    { value: '4%', label: 'of teachers say they can finish within contracted hours', source: 'Tes Teacher Wellbeing Report 2026', url: 'https://www.tes.com/magazine/news/general/two-thirds-teachers-working-almost-extra-day-week' },
+    { value: '50%', label: 'of UK teachers already use AI to create quizzes', source: 'Teacher Tapp via Chartered College', url: 'https://my.chartered.college/impact_article/from-novelty-to-normal-how-teachers-are-using-ai-in-2026/' },
+    { value: '41%', label: 'would not trust AI accuracy without checking it themselves', source: 'Decksy survey of 1,036 US teachers', url: 'https://technofaq.org/posts/2026/10/ai-saves-teachers-hours-every-week' },
+];
+const solutions = [
+    { icon: Clock, problem: 'Marking spills into evenings and weekends.', evidence: 'US teachers report about 9.9 hours of grading a week, and most take it home.', src: 'Learnosity survey', solve: 'MCQs are checked against your answer key straight away. Written answers arrive with drafted marks and explanations, so you review instead of starting from blank.', proof: 'Exact MCQ check · AI-drafted written marks' },
+    { icon: FileText, problem: 'Building a paper takes real effort.', evidence: 'About half of UK teachers already use AI to write quizzes.', src: 'Teacher Tapp', solve: 'Upload notes or paste a syllabus. Quesly drafts questions, an answer key and a marking guide, then exports separate student and teacher PDFs.', proof: 'Your notes in · reviewed paper out' },
+    { icon: ShieldCheck, problem: 'AI output cannot be trusted blindly.', evidence: 'Many teachers say they would check AI facts themselves, and reliability worries keep non-users away.', src: 'Decksy · Teacher Tapp', solve: 'You compare each question with your notes. Written marks are suggestions only, and nothing is shared until you save final marks and release them.', proof: 'Teacher review · save before share' },
+    { icon: Layers, problem: 'The work is spread across too many steps.', evidence: 'Only 4% of teachers say they finish within contracted hours.', src: 'Tes 2026', solve: 'One assignment holds the notes, paper, student access, submissions and results. Students sign in with a teacher-issued ID and private code.', proof: 'One workflow, start to shared' },
 ];
 const faqs = [
     ['Will AI decide the final marks?', 'No. MCQs are checked against one fixed answer. Written-answer marks from Jev are suggestions. You review the student’s work, enter or adjust the marks, save them and decide when students can see the results.'],
@@ -31,7 +46,7 @@ export default function Landing() {
 
         <div className="qx-navwrap"><header className="qx-nav">
             <Link className="qx-brand" href="/" aria-label="Quesly home"><span className="qx-logo">q.</span>quesly<i>.</i></Link>
-            <nav aria-label="Main navigation"><a href="#why">The problem</a><a href="#workflow">How it works</a><a href="#grading">Marking</a><a href="#questions">Questions?</a></nav>
+            <nav aria-label="Main navigation"><a href="#why">The problem</a><a href="#solution">Solutions</a><a href="#workflow">How it works</a><a href="#grading">Marking</a><a href="#questions">Questions?</a></nav>
             <Link className="qx-btn qx-btn-dark qx-btn-sm" href="/login">Teacher sign in <ArrowUpRight size={15} /></Link>
         </header></div>
 
@@ -54,11 +69,16 @@ export default function Landing() {
                 </div>
 
                 <div className="qx-posts">
-                    <div className="qx-posts-head"><h2>What teachers are talking about.</h2><p>Real public discussions. Open the original to read more. Independent of Quesly.</p></div>
+                    <div className="qx-posts-head"><h2>What teachers are talking about.</h2><p>Real public discussions and independent surveys. Open the original to read more.</p></div>
                     <div className="qx-posts-grid">{sources.map(s =>
                         <a className="qx-post" key={s.platform} href={s.url} target="_blank" rel="noreferrer" aria-label={`Open the public ${s.platform} post about assessment`}>
-                            <div className="qx-post-img"><img src={s.image} alt={s.alt} loading="eager" /></div>
+                            <div className="qx-post-img"><span className="qx-fb">{s.platform}</span><img src={shot(s.url)} alt={s.alt} loading="eager" referrerPolicy="no-referrer" /></div>
                             <div className="qx-post-body"><span>{s.platform} · {s.type}</span><h3>{s.title}</h3><p>View the original <ArrowUpRight size={12} /></p></div>
+                        </a>)}</div>
+                    <div className="qx-stats">{stats.map(s =>
+                        <a className="qx-stat" key={s.source} href={s.url} target="_blank" rel="noreferrer" aria-label={`${s.value} ${s.label}. Source: ${s.source}`}>
+                            <div className="qx-stat-img"><span className="qx-fb">{s.source}</span><img src={shot(s.url, 700, 440)} alt="" loading="lazy" referrerPolicy="no-referrer" /></div>
+                            <div className="qx-stat-body"><strong>{s.value}</strong><p>{s.label}</p><span>{s.source} <ArrowUpRight size={11} /></span></div>
                         </a>)}</div>
                 </div>
             </section>
@@ -77,8 +97,29 @@ export default function Landing() {
                         <div className="qx-help"><span>How Quesly helps</span><p>{s.response}</p></div>
                         <a href={s.url} target="_blank" rel="noreferrer" className="qx-link">Read the original <ArrowUpRight size={14} /></a>
                     </article>)}</div>
-                <p className="qx-note">Independent sources, not Quesly customers or endorsements. Screenshots are cropped public excerpts captured on 23 October 2026. These discussions explain the problem; they do not validate Quesly’s accuracy or prove time savings.</p>
+                <p className="qx-note">Independent sources, not Quesly customers or endorsements. Screenshots are live previews of the public pages, loaded from a third-party screenshot service. These discussions explain the problem; they do not validate Quesly’s accuracy or prove time savings.</p>
                 <p className="qx-note">Also discussed on Reddit: <a href="https://www.reddit.com/r/Teachers/comments/1xab5s3/admin_wants_to_mandate_using_ai_to_grade_essays/" target="_blank" rel="noreferrer">concerns about AI marks missing important gaps in students’ work <ArrowUpRight size={12} /></a>.</p>
+            </section>
+
+            {/* SOLUTION */}
+            <section className="qx-solve qx-wrap" id="solution">
+                <div className="qx-head"><div><p className="qx-eyebrow"><span />How Quesly solves it</p><h2>Each problem teachers raise,<br />answered in the product.</h2></div><p>Every row pairs a pressure teachers describe with what Quesly actually does about it. Quesly drafts. You decide.</p></div>
+                <div className="qx-solve-list">{solutions.map(s =>
+                    <article className="qx-solve-row" key={s.problem}>
+                        <div className="qx-solve-problem">
+                            <span className="qx-ico"><s.icon size={22} /></span>
+                            <h3>{s.problem}</h3>
+                            <p>{s.evidence}</p>
+                            <em>{s.src}</em>
+                        </div>
+                        <ArrowRight className="qx-solve-arrow" size={22} />
+                        <div className="qx-solve-answer">
+                            <span>Quesly’s answer</span>
+                            <p>{s.solve}</p>
+                            <b><Check size={14} />{s.proof}</b>
+                        </div>
+                    </article>)}</div>
+                <p className="qx-note">Figures come from independent surveys, not Quesly customers. The Learnosity and Decksy surveys come from companies that sell to teachers. These numbers describe the problem; they do not prove that Quesly saves time or grades accurately.</p>
             </section>
 
             {/* WORKFLOW */}
@@ -193,13 +234,25 @@ export default function Landing() {
 .qx-posts-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
 .qx-post{display:flex;flex-direction:column;overflow:hidden;background:var(--paper);border:1px solid var(--line);border-radius:20px;transition:transform .3s,box-shadow .3s,border-color .3s}
 .qx-post:hover{transform:translateY(-5px);border-color:var(--g);box-shadow:0 20px 40px rgba(15,61,42,.12)}
-.qx-post-img{height:170px;overflow:hidden;background:var(--paper-2);border-bottom:1px solid var(--line)}
-.qx-post-img img{width:100%;height:100%;object-fit:cover;object-position:top;transition:transform .6s}
-.qx-post:hover .qx-post-img img{transform:scale(1.04)}
+.qx-post-img,.qx-stat-img{position:relative;overflow:hidden;background:var(--paper-2);border-bottom:1px solid var(--line)}
+.qx-post-img{aspect-ratio:900/620}
+.qx-stat-img{aspect-ratio:700/440}
+.qx-fb{position:absolute;inset:0;display:grid;place-items:center;padding:12px;text-align:center;font-size:14px;font-weight:800;letter-spacing:-.02em;color:var(--g);background:linear-gradient(135deg,var(--g-soft),var(--paper-2))}
+.qx-post-img img,.qx-stat-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;color:transparent;background:var(--paper-2);transition:transform .6s}
+.qx-post:hover .qx-post-img img,.qx-stat:hover .qx-stat-img img{transform:scale(1.04)}
 .qx-post-body{padding:18px 20px 20px}
 .qx-post-body span{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--g)}
 .qx-post-body h3{margin:8px 0 10px;font-size:1.15rem;font-weight:800}
 .qx-post-body p{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:700;color:var(--ink-2)}
+
+/* stats */
+.qx-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:22px}
+.qx-stat{display:flex;flex-direction:column;overflow:hidden;background:var(--g-tint);border:1px solid var(--line);border-radius:20px;transition:transform .3s,border-color .3s,box-shadow .3s}
+.qx-stat:hover{transform:translateY(-4px);border-color:var(--g);box-shadow:0 16px 34px rgba(15,61,42,.1)}
+.qx-stat-body{display:flex;flex:1;flex-direction:column;gap:6px;padding:18px 20px 20px}
+.qx-stat strong{font-size:2.4rem;font-weight:800;letter-spacing:-.05em;line-height:1;color:var(--g)}
+.qx-stat p{font-size:13.5px;line-height:1.5;font-weight:600;color:var(--ink)}
+.qx-stat-body span{margin-top:auto;padding-top:6px;display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
 
 /* strip */
 .qx-strip{background:var(--g-dark);color:#e6f2ea;padding:18px 0}
@@ -230,6 +283,22 @@ export default function Landing() {
 .qx-note{max-width:860px;margin-top:22px;font-size:12.5px;line-height:1.65;color:#6c7a72}
 .qx-note a{color:var(--g);font-weight:700;text-decoration:underline;text-underline-offset:3px}
 
+/* solution */
+.qx-solve{padding:110px 0 20px}
+.qx-solve-list{display:grid;gap:16px}
+.qx-solve-row{display:grid;grid-template-columns:1fr 40px 1.2fr;gap:18px;align-items:stretch}
+.qx-solve-problem,.qx-solve-answer{padding:28px;border-radius:26px;border:1px solid var(--line)}
+.qx-solve-problem{background:var(--card)}
+.qx-solve-problem h3{margin-top:18px;font-size:1.3rem;font-weight:800}
+.qx-solve-problem p{margin-top:10px;font-size:14.5px;line-height:1.6;color:var(--ink-2)}
+.qx-solve-problem em{display:block;margin-top:12px;font-style:normal;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6c7a72}
+.qx-solve-arrow{align-self:center;justify-self:center;color:var(--g)}
+.qx-solve-answer{background:var(--g-dark);border-color:var(--g-dark);color:#fff;display:flex;flex-direction:column;gap:12px;justify-content:center;transition:transform .3s,box-shadow .3s}
+.qx-solve-row:hover .qx-solve-answer{transform:translateY(-4px);box-shadow:0 24px 46px rgba(15,61,42,.25)}
+.qx-solve-answer span{font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#8fc2a6}
+.qx-solve-answer p{font-size:1.05rem;line-height:1.6;color:#e6f2ea}
+.qx-solve-answer b{display:inline-flex;align-items:center;gap:8px;width:max-content;max-width:100%;padding:6px 12px;background:rgba(255,255,255,.1);border-radius:999px;font-size:12.5px;font-weight:700;color:#9fd3b6}
+
 /* workflow */
 .qx-flow{margin-top:110px;padding:100px 0;background:var(--paper-2);border-block:1px solid var(--line)}
 .qx-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;counter-reset:s}
@@ -243,10 +312,9 @@ export default function Landing() {
 .qx-step h3{font-size:1.3rem;font-weight:800}
 .qx-step p{margin-top:10px;font-size:14.5px;line-height:1.65;color:var(--ink-2);transition:color .3s}
 .qx-step:hover p{color:#c9dfd1}
-.qx-detail{display:flex;align-items:flex-start;gap:8px;margin-top:auto;padding-top:20px;font-size:13px;font-weight:700;color:var(--g)}
+.qx-detail{display:flex;align-items:flex-start;gap:8px;margin-top:auto;padding-top:20px;font-size:13px;font-weight:700;color:var(--g);border-top:0}
 .qx-detail svg{flex:none;margin-top:2px}
 .qx-step:hover .qx-detail{color:#9fd3b6}
-.qx-detail{border-top:0}
 
 /* grading */
 .qx-grading{padding:110px 0;background:var(--g-deep);color:#fff;position:relative;overflow:hidden}
@@ -307,16 +375,18 @@ export default function Landing() {
 @media (max-width:1000px){
  .qx-nav nav{display:none}
  .qx-hero-grid,.qx-head,.qx-grading-grid,.qx-faq{grid-template-columns:1fr}
- .qx-posts-grid,.qx-problem-grid,.qx-steps,.qx-take{grid-template-columns:1fr 1fr}
+ .qx-posts-grid,.qx-problem-grid,.qx-steps,.qx-take,.qx-stats{grid-template-columns:1fr 1fr}
+ .qx-solve-row{grid-template-columns:1fr}
+ .qx-solve-arrow{transform:rotate(90deg)}
  .qx-faq-intro{position:static}
  .qx-final{padding:44px 32px}
 }
 @media (max-width:640px){
  .qx-wrap{width:calc(100% - 32px)}
  .qx-navwrap{padding:10px 12px}
- .qx-posts-grid,.qx-problem-grid,.qx-steps,.qx-take{grid-template-columns:1fr}
+ .qx-posts-grid,.qx-problem-grid,.qx-steps,.qx-take,.qx-stats{grid-template-columns:1fr}
  .qx-posts{padding:20px}
- .qx-section{padding-top:80px}.qx-flow{padding:70px 0;margin-top:80px}.qx-grading{padding:80px 0}
+ .qx-section,.qx-solve{padding-top:80px}.qx-flow{padding:70px 0;margin-top:80px}.qx-grading{padding:80px 0}
  .qx-final{padding:36px 24px;border-radius:28px}
  .qx-btn{width:100%}.qx-btn-sm{width:auto}
 }
