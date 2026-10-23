@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Brand from '@/components/Brand';
 import { ArrowRight, ArrowUpRight, BookOpen, Check, FileCheck2, FileText, GraduationCap, LockKeyhole, MessageSquareText, Users, Download, ChevronDown, Clock, ShieldCheck, Layers } from 'lucide-react';
 import AssessmentPreview from '@/components/landing/AssessmentPreview';
 import './landing.css';
@@ -47,7 +48,7 @@ export default function Landing() {
         <div className="qx-navwrap"><header className="qx-nav">
             <Link className="qx-brand" href="/" aria-label="Quesly home"><span className="qx-logo">q.</span>quesly<i>.</i></Link>
             <nav aria-label="Main navigation"><a href="#why">The problem</a><a href="#solution">Solutions</a><a href="#workflow">How it works</a><a href="#grading">Marking</a><a href="#questions">Questions?</a></nav>
-            <Link className="qx-btn qx-btn-dark qx-btn-sm" href="/login">Teacher sign in <ArrowUpRight size={15} /></Link>
+            <Link className="qx-btn qx-btn-dark qx-btn-sm" href="/waitlist">Join the waitlist <ArrowUpRight size={15} /></Link>
         </header></div>
 
         <main id="main">
@@ -59,7 +60,7 @@ export default function Landing() {
                         <h1>From class notes to <em>clear feedback.</em></h1>
                         <p className="qx-lead">Make a question paper from your notes. Collect student answers. Review suggested marks and share the feedback you stand behind.</p>
                         <div className="qx-ctas">
-                            <Link href="/login" className="qx-btn qx-btn-primary">Start a paper <ArrowRight size={18} /></Link>
+                            <Link href="/waitlist" className="qx-btn qx-btn-primary">Join the waitlist <ArrowRight size={18} /></Link>
                             <a href="#workflow" className="qx-link">See the whole process <ArrowRight size={16} /></a>
                         </div>
                         <ul className="qx-ticks"><li><Check size={15} />Your teaching material</li><li><Check size={15} />Your final decision</li></ul>
@@ -165,14 +166,14 @@ export default function Landing() {
             {/* FINAL */}
             <section className="qx-final-wrap qx-wrap"><div className="qx-final">
                 <div><p className="qx-eyebrow qx-eyebrow-light"><span />Bring the lesson you already have</p><h2>Start with your next class.</h2><p>A small paper. A careful review. A clearer way to give feedback.</p></div>
-                <Link href="/login" className="qx-btn qx-btn-light">Open the teacher workspace <ArrowRight size={18} /></Link>
+                <Link href="/waitlist" className="qx-btn qx-btn-light">Join the waitlist <ArrowRight size={18} /></Link>
             </div></section>
         </main>
 
         <footer className="qx-footer qx-wrap">
             <Link href="/" className="qx-brand"><span className="qx-logo">q.</span>quesly<i>.</i></Link>
             <p>Your notes. Your class. Your call.</p>
-            <div><Link href="/student">Student portal <ArrowUpRight size={14} /></Link><Link href="/login">Teacher sign in <ArrowUpRight size={14} /></Link></div>
+            <div><Link href="/student">Student portal <ArrowUpRight size={14} /></Link><Link href="/waitlist">Join the waitlist <ArrowUpRight size={14} /></Link></div>
         </footer>
 
         <style>{`

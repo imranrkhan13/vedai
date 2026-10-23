@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { getDb } from './db';
 import { Request, Response, NextFunction } from 'express';
 
 // Self-hosted auth: scrypt password hashes and HMAC-signed tokens, using only Node's built-in crypto.
@@ -46,11 +47,15 @@ export function verifyToken(token: string, aud?: string): string | null {
 
 declare module 'express-serve-static-core' { interface Request { userId?: string } }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const h = req.headers.authorization || '';
   const uid = h.startsWith('Bearer ') ? verifyToken(h.slice(7)) : verifyToken(readCookie(req, 'vedai_session'));
   if (!uid || uid.startsWith('student:')) return res.status(401).json({ success: false, error: 'Please sign in' });
   if (!h.startsWith('Bearer ') && !['GET','HEAD','OPTIONS'].includes(req.method) && req.headers['x-requested-with'] !== 'quillix') return res.status(403).json({ success: false, error: 'Blocked request' });
+  try {
+    const { rows } = await getDb().query('SELECT id FROM vedai_users WHERE id=$1 AND access_approved=true', [uid]);
+    if (!rows[0]) return res.status(403).json({ success:false, error:'Access has not been approved. Please join the waitlist.' });
+  } catch { return res.status(503).json({success:false,error:'Could not check access. Please try again.'}); }
   req.userId = uid;
   next();
 }

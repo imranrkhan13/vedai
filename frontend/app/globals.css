@@ -237,3 +237,5 @@ button, input, textarea, select { font-family: inherit; }
 :focus-visible { outline: 3px solid #fb923c; outline-offset: 3px; }
 
 button,input,textarea,select{font-family:inherit} h1,h2,h3{letter-spacing:-.035em} @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+.quesly-brand{display:inline-flex;align-items:center;gap:9px;color:#244438!important;text-decoration:none;font-size:26px;font-weight:800;letter-spacing:-1.3px;white-space:nowrap}.quesly-brand-mark{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:#244438;color:#fbfaf6;font-size:30px;letter-spacing:-3px;padding:0 3px 6px 0}.quesly-brand-dot{color:#8a754d}.quesly-brand:focus-visible{outline:3px solid #91ac79;outline-offset:5px}

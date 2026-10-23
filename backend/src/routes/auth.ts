@@ -18,29 +18,17 @@ function limited(req: Request): boolean {
   return false;
 }
 
-router.post('/register', async (req: Request, res: Response) => {
-  if (limited(req)) return res.status(429).json({ success: false, error: 'Too many attempts. Try again later.' });
-  const p = Creds.safeParse(req.body);
-  if (!p.success) return res.status(400).json({ success: false, error: 'Enter a valid email and a password of at least 8 characters' });
-  try {
-    const { rows } = await getDb().query(
-      'INSERT INTO vedai_users (email, password_hash) VALUES ($1,$2) ON CONFLICT (email) DO NOTHING RETURNING id, email',
-      [p.data.email, hashPassword(p.data.password)]
-    );
-    if (!rows[0]) return res.status(409).json({ success: false, error: 'That email is already registered' });
-    res.cookie('vedai_session', signToken(rows[0].id), cookieOptions);
-    return res.status(201).json({ success: true, data: { token: signToken(rows[0].id), user: { id: rows[0].id, email: rows[0].email } } });
-  } catch { return res.status(500).json({ success: false, error: 'Could not register' }); }
-});
+router.post('/register', (_req,res) => res.status(403).json({success:false,error:'Registration is by approval only. Join the waitlist or book a call.'}));
 
 router.post('/login', async (req: Request, res: Response) => {
   if (limited(req)) return res.status(429).json({ success: false, error: 'Too many attempts. Try again later.' });
   const p = Creds.safeParse(req.body);
   if (!p.success) return res.status(400).json({ success: false, error: 'Enter a valid email and password' });
   try {
-    const { rows } = await getDb().query('SELECT id, email, password_hash FROM vedai_users WHERE email=$1', [p.data.email]);
+    const { rows } = await getDb().query('SELECT id, email, password_hash, access_approved FROM vedai_users WHERE email=$1', [p.data.email]);
     const u = rows[0];
     if (!u || !verifyPassword(p.data.password, u.password_hash)) return res.status(401).json({ success: false, error: 'Wrong email or password' });
+    if (!u.access_approved) return res.status(403).json({success:false,error:'Access has not been approved. Please join the waitlist.'});
     res.cookie('vedai_session', signToken(u.id), cookieOptions);
     return res.json({ success: true, data: { token: signToken(u.id), user: { id: u.id, email: u.email } } });
   } catch { return res.status(500).json({ success: false, error: 'Could not sign in' }); }

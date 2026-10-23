@@ -1,4 +1,5 @@
 'use client';
+import Brand from '@/components/Brand';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
@@ -20,12 +21,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
     <div style={{ width: 248, height: '100%', background: '#fff', borderRight: '1px solid #EBEBEB', display: 'flex', flexDirection: 'column', padding: '16px 12px' }}>
       {/* Logo */}
       <div style={{ padding: '4px 8px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Link href="/home" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none' }}>
-          <div style={{ width: 32, height: 32, borderRadius: 9, background: '#2c5145', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 16, boxShadow: '0 2px 8px rgba(44,81,69,0.35)', transition: 'transform 0.2s' }}
-            onMouseEnter={e => (e.currentTarget.style.transform = 'rotate(-5deg) scale(1.08)')}
-            onMouseLeave={e => (e.currentTarget.style.transform = 'none')}>Q</div>
-          <span style={{ fontSize: 17, fontWeight: 700, color: '#1A1A1A', letterSpacing: '-0.3px' }}>Quesly</span>
-        </Link>
+        <Brand href="/home"/>
         {onClose && <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 4 }}><X size={16} /></button>}
       </div>
 

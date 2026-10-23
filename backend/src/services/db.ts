@@ -46,6 +46,12 @@ CREATE TABLE IF NOT EXISTS vedai_users (
   password_hash TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE vedai_users ADD COLUMN IF NOT EXISTS access_approved BOOLEAN NOT NULL DEFAULT false;
+CREATE TABLE IF NOT EXISTS vedai_waitlist (
+ id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text, email TEXT NOT NULL UNIQUE,
+ name TEXT NOT NULL, institution TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE vedai_waitlist ADD COLUMN IF NOT EXISTS notified_at TIMESTAMPTZ;
 CREATE TABLE IF NOT EXISTS vedai_institutions (
  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text, name TEXT NOT NULL,
  admin_id TEXT NOT NULL UNIQUE REFERENCES vedai_users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT now()

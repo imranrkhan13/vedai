@@ -29,7 +29,7 @@ async function student(req: Request) {
  const uid = verifyToken(readCookie(req, 'vedai_student'));
  if (!uid?.startsWith('student:')) return null;
  const [, id, version] = uid.split(':');
- const { rows } = await getDb().query('SELECT * FROM vedai_classroom_students WHERE id=$1 AND session_version=$2', [id, Number(version)]);
+ const { rows } = await getDb().query('SELECT s.* FROM vedai_classroom_students s JOIN vedai_assignments a ON a.id=s.assignment_id JOIN vedai_users u ON u.id=a.owner_id WHERE s.id=$1 AND s.session_version=$2 AND u.access_approved=true', [id, Number(version)]);
  return rows[0] || null;
 }
 async function owned(req: Request) { return Assignment.findById(String(req.params.aid), req.userId!); }
@@ -93,7 +93,7 @@ studentRoutes.post('/login', wrap(async (req,res) => {
  const ip = req.ip || ''; const now = Date.now(); const hit = attempts.get(ip); if (hit && hit.until > now && hit.count >= 20) return fail(res,429,'Too many attempts. Try again in 15 minutes.');
  attempts.set(ip,{count: hit && hit.until > now ? hit.count + 1 : 1,until: hit && hit.until > now ? hit.until : now + 900000});
  const p = z.object({studentId:z.string().trim().max(80),accessCode:z.string().max(100)}).safeParse(req.body); if (!p.success) return fail(res,400,'Enter your ID and access code');
- const { rows } = await getDb().query('SELECT * FROM vedai_classroom_students WHERE student_id=$1',[p.data.studentId]); const s = rows.find(s => verifyStudentCode(p.data.accessCode, s.code_hash));
+ const { rows } = await getDb().query('SELECT s.* FROM vedai_classroom_students s JOIN vedai_assignments a ON a.id=s.assignment_id JOIN vedai_users u ON u.id=a.owner_id WHERE s.student_id=$1 AND u.access_approved=true',[p.data.studentId]); const s = rows.find(s => verifyStudentCode(p.data.accessCode, s.code_hash));
  if (!s) return fail(res,401,'Wrong student ID or access code');
  res.cookie('vedai_student',signToken(`student:${s.id}:${s.session_version}`),cookieOptions); return send(res,{student:{studentId:s.student_id,name:s.name}});
 }));

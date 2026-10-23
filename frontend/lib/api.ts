@@ -26,6 +26,7 @@ async function fetchAPI<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  joinWaitlist: (name:string,email:string,institution:string) => fetchAPI('/waitlist',{method:'POST',body:JSON.stringify({name,email,institution})}),
   schoolMe: () => fetchAPI<{id:string;name:string;role:string}|null>('/institutions/me'),
   schoolCreate: (name:string) => fetchAPI('/institutions', {method:'POST',body:JSON.stringify({name})}),
   schoolInvite: (email:string) => fetchAPI<{token:string;email:string}>('/institutions/invitations',{method:'POST',body:JSON.stringify({email})}),

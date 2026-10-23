@@ -1,4 +1,5 @@
 'use client';
+import Brand from '@/components/Brand';
 import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Eye, EyeOff, BookOpen, GraduationCap } from 'lucide-react';
@@ -32,7 +33,7 @@ export default function LoginPage() {
   return (
     <main className="login-page">
       <section className="login-story" aria-label="Welcome to Quesly">
-        <Link href="/" className="login-brand"><span>q.</span>quesly.</Link>
+        <Brand/>
         <div className="login-story-copy"><p className="login-kicker">A LITTLE LESS PAPERWORK.</p><h1>More room<br/>for teaching.</h1><p>Turn your class notes into questions.<br/>Bring answers, marks and feedback together.</p></div>
         <svg className="login-illustration" viewBox="0 0 600 410" role="img" aria-labelledby="login-art-title"><title id="login-art-title">Illustration of a teacher’s desk with an open notebook, question paper and a growing plant</title>
           <ellipse cx="300" cy="367" rx="250" ry="24" fill="#c8d6bb"/>
@@ -53,7 +54,7 @@ export default function LoginPage() {
           <label htmlFor="teacher-password">Password</label><div className="login-password"><input id="teacher-password" type={showPassword?'text':'password'} required minLength={8} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder={mode==='register'?'Choose at least 8 characters':'Enter your password'} value={password} onChange={e=>setPassword(e.target.value)} disabled={busy}/><button type="button" aria-label={showPassword?'Hide password':'Show password'} aria-pressed={showPassword} onClick={()=>setShowPassword(!showPassword)}>{showPassword?<EyeOff size={19}/>:<Eye size={19}/>}</button></div>
           {mode==='register'&&<p className="login-hint">Use at least 8 characters.</p>}
           <button className="login-submit" type="submit" disabled={busy}>{busy?'Please wait…':mode==='login'?'Sign in':'Create account'}<ArrowRight size={18}/></button>
-          <p className="login-switch">{mode==='login'?'New to Quesly?':'Already have an account?'} <button type="button" disabled={busy} onClick={()=>{setMode(mode==='login'?'register':'login');setShowPassword(false);}}>{mode==='login'?'Create an account':'Sign in'}</button></p>
+          <p className="login-switch">Access is by approval. <Link href="/waitlist">Join the waitlist</Link></p>
         </form>
         <div className="login-student"><GraduationCap size={24}/><div><strong>Here as a student?</strong><p>Use the ID and code your teacher gave you.</p></div><Link href="/student" aria-label="Open student sign in"><ArrowRight size={20}/></Link></div>
         <p className="login-school-note">Invited by your school? Sign in with the email on your invitation, then open your invitation link.</p>
