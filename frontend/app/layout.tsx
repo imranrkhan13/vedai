@@ -4,8 +4,8 @@ import './globals.css';
 import AuthGate from '@/components/AuthGate';
 
 export const metadata: Metadata = {
-  title: 'Ques-AI',
-  description: 'AI Assessment Creator',
+  title: 'Quesly | From class notes to clear feedback',
+  description: 'Create a paper from your notes, collect student answers, and review suggested marks before sharing results. Teachers stay in control with Quesly.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
