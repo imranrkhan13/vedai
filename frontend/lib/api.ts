@@ -26,6 +26,11 @@ async function fetchAPI<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  schoolMe: () => fetchAPI<{id:string;name:string;role:string}|null>('/institutions/me'),
+  schoolCreate: (name:string) => fetchAPI('/institutions', {method:'POST',body:JSON.stringify({name})}),
+  schoolInvite: (email:string) => fetchAPI<{token:string;email:string}>('/institutions/invitations',{method:'POST',body:JSON.stringify({email})}),
+  schoolAccept: (token:string) => fetchAPI('/institutions/accept',{method:'POST',body:JSON.stringify({token})}),
+  schoolOverview: () => fetchAPI<{teachers:{id:string;email:string;role:string}[];assignments:{id:string;title:string;status:string}[];students:{id:string;name:string;student_id:string;submitted_at:string|null;released:boolean}[]}>('/institutions/overview'),
   login: (email: string, password: string) =>
     fetchAPI<{ user: { id: string; email: string } }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   register: (email: string, password: string) =>

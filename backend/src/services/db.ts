@@ -46,6 +46,20 @@ CREATE TABLE IF NOT EXISTS vedai_users (
   password_hash TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS vedai_institutions (
+ id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text, name TEXT NOT NULL,
+ admin_id TEXT NOT NULL UNIQUE REFERENCES vedai_users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS vedai_memberships (
+ user_id TEXT PRIMARY KEY REFERENCES vedai_users(id), institution_id TEXT NOT NULL REFERENCES vedai_institutions(id),
+ role TEXT NOT NULL CHECK (role IN ('admin','teacher'))
+);
+CREATE TABLE IF NOT EXISTS vedai_invitations (
+ id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text, institution_id TEXT NOT NULL REFERENCES vedai_institutions(id),
+ email TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, expires_at TIMESTAMPTZ NOT NULL,
+ accepted_at TIMESTAMPTZ, revoked_at TIMESTAMPTZ
+);
+ALTER TABLE vedai_assignments ADD COLUMN IF NOT EXISTS institution_id TEXT REFERENCES vedai_institutions(id);
 CREATE TABLE IF NOT EXISTS vedai_classroom_students (
  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
  assignment_id TEXT NOT NULL REFERENCES vedai_assignments(id) ON DELETE CASCADE,

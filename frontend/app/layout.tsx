@@ -14,7 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&display=swap" rel="stylesheet" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body>
@@ -23,7 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           style: {
             background: '#fff', color: '#1A1A1A',
             border: '1px solid #E5E7EB', borderRadius: '10px',
-            fontSize: '13px', fontFamily: 'Inter, sans-serif',
+            fontSize: '13px', fontFamily: 'Bricolage Grotesque, sans-serif',
             boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
           },
         }} />

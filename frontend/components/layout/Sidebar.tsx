@@ -6,6 +6,7 @@ import { useAssignmentStore } from '@/store/assignmentStore';
 import { Home, BookOpen, Library, Sparkles, Settings, Menu, X } from 'lucide-react';
 
 const NAV = [
+  { href: '/institution', label: 'School workspace', icon: Home },
   { href: '/home',        label: 'Home',                icon: Home },
   { href: '/assignments', label: 'Assignments',          icon: BookOpen },
   { href: '/library',     label: 'My Library',           icon: Library },
@@ -20,10 +21,10 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       {/* Logo */}
       <div style={{ padding: '4px 8px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link href="/home" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none' }}>
-          <div style={{ width: 32, height: 32, borderRadius: 9, background: '#F97316', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 16, boxShadow: '0 2px 8px rgba(249,115,22,0.35)', transition: 'transform 0.2s' }}
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: '#2c5145', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 16, boxShadow: '0 2px 8px rgba(44,81,69,0.35)', transition: 'transform 0.2s' }}
             onMouseEnter={e => (e.currentTarget.style.transform = 'rotate(-5deg) scale(1.08)')}
             onMouseLeave={e => (e.currentTarget.style.transform = 'none')}>Q</div>
-          <span style={{ fontSize: 17, fontWeight: 700, color: '#1A1A1A', letterSpacing: '-0.3px' }}>Ques-AI</span>
+          <span style={{ fontSize: 17, fontWeight: 700, color: '#1A1A1A', letterSpacing: '-0.3px' }}>Quesly</span>
         </Link>
         {onClose && <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 4 }}><X size={16} /></button>}
       </div>
@@ -41,11 +42,11 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           const active = path === href || (href !== '/home' && path.startsWith(href));
           return (
             <Link key={href} href={href} className={`nav-item${active ? ' active' : ''}`} onClick={onClose}
-              style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8, marginBottom: 2, fontSize: 13, cursor: 'pointer', textDecoration: 'none', transition: 'all 0.15s', color: active ? '#F97316' : '#6B7280', fontWeight: active ? 600 : 400, background: active ? '#FFF4EE' : 'transparent', position: 'relative' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8, marginBottom: 2, fontSize: 13, cursor: 'pointer', textDecoration: 'none', transition: 'all 0.15s', color: active ? '#2c5145' : '#6B7280', fontWeight: active ? 600 : 400, background: active ? '#edf3e8' : 'transparent', position: 'relative' }}>
               <Icon size={16} />
               <span style={{ flex: 1 }}>{label}</span>
               {label === 'Assignments' && count > 0 && (
-                <span style={{ background: '#F97316', color: '#fff', borderRadius: 20, fontSize: 10, fontWeight: 700, padding: '1px 6px', lineHeight: 1.6 }}>{count}</span>
+                <span style={{ background: '#2c5145', color: '#fff', borderRadius: 20, fontSize: 10, fontWeight: 700, padding: '1px 6px', lineHeight: 1.6 }}>{count}</span>
               )}
             </Link>
           );
@@ -60,11 +61,11 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           <Settings size={16} /> Settings
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 9, background: '#F9FAFB', border: '1px solid #F3F4F6', cursor: 'pointer', transition: 'all 0.15s' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#F97316'; (e.currentTarget as HTMLDivElement).style.background = '#FFF4EE'; }}
+          onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#2c5145'; (e.currentTarget as HTMLDivElement).style.background = '#edf3e8'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#F3F4F6'; (e.currentTarget as HTMLDivElement).style.background = '#F9FAFB'; }}>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#F97316,#FB923C)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12, flexShrink: 0, boxShadow: '0 2px 6px rgba(249,115,22,0.3)' }}>Q</div>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#2c5145,#477663)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12, flexShrink: 0, boxShadow: '0 2px 6px rgba(44,81,69,0.3)' }}>Q</div>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#1A1A1A' }}>Ques-AI</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#1A1A1A' }}>Quesly</div>
             <div style={{ fontSize: 11, color: '#9CA3AF' }}>Question paper generator</div>
           </div>
         </div>

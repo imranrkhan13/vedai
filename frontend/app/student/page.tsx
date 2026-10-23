@@ -43,7 +43,7 @@ export default function StudentPage() {
   if (!me) return (
     <div className="classroom" style={{ minHeight: '100vh', background:'#f5f7f2', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <form onSubmit={login} className="card" style={{ width: '100%', maxWidth: 380, padding: 28 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Ques-AI</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Quesly</h1>
         <p style={{ fontSize: 13, color: 'var(--gray-500)', marginBottom: 20 }}>Student sign in. Use the student ID and access code your teacher gave you.</p>
         <label htmlFor="student-id" style={{ fontSize: 12, fontWeight: 600 }}>Student ID</label>
         <input id="student-id" className="input" required autoComplete="username" value={sid} onChange={e => setSid(e.target.value)} style={{ marginBottom: 12, marginTop: 4 }} />
@@ -65,7 +65,7 @@ export default function StudentPage() {
       {confirmNode}
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 17, fontWeight: 700 }}>Ques-AI</span>
+          <span style={{ fontSize: 17, fontWeight: 700 }}>Quesly</span>
           <span style={{ fontSize: 12, color: 'var(--gray-500)' }}>Student {me.student.studentId}{me.student.name ? ` (${me.student.name})` : ''} <button className="btn btn-ghost btn-sm" onClick={logout} style={{ marginLeft: 8 }}>Sign out</button></span>
         </div>
         <div className="card" style={{ padding: '18px 20px', marginBottom: 14 }}>

@@ -248,7 +248,7 @@ export default function OutputPage() {
                       <span style={{ color:'var(--gray-700)', fontWeight:500, minWidth:100 }}>{label}</span>
                       <input value={val} onChange={e=>set(e.target.value)}
                         style={{ width:w, padding:'2px 4px', border:'none', borderBottom:'1px solid #9CA3AF', outline:'none', fontSize:13, fontFamily:'Inter,sans-serif', background:'transparent', color:'var(--black)', transition:'border-color 0.15s' }}
-                        onFocus={e=>(e.target.style.borderColor='#F97316')}
+                        onFocus={e=>(e.target.style.borderColor='#2c5145')}
                         onBlur={e=>(e.target.style.borderColor='#9CA3AF')}/>
                     </div>
                   ))}

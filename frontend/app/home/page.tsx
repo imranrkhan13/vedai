@@ -33,11 +33,11 @@ export default function HomePage() {
         <div style={{ padding:'24px 28px 60px' }}>
           {/* Hero */}
           <div className="fade-up" style={{ background:'var(--black)', borderRadius:16, padding:'28px 32px', marginBottom:20, position:'relative', overflow:'hidden' }}>
-            <div style={{ position:'absolute', right:-30, top:-30, width:220, height:220, borderRadius:'50%', background:'rgba(249,115,22,0.08)', animation:'float 4s ease-in-out infinite' }} />
-            <div style={{ position:'absolute', right:60, bottom:-50, width:150, height:150, borderRadius:'50%', background:'rgba(249,115,22,0.05)', animation:'float 5s ease-in-out infinite 1s' }} />
+            <div style={{ position:'absolute', right:-30, top:-30, width:220, height:220, borderRadius:'50%', background:'rgba(44,81,69,0.08)', animation:'float 4s ease-in-out infinite' }} />
+            <div style={{ position:'absolute', right:60, bottom:-50, width:150, height:150, borderRadius:'50%', background:'rgba(44,81,69,0.05)', animation:'float 5s ease-in-out infinite 1s' }} />
             <div style={{ position:'relative' }}>
               <p style={{ fontSize:12, color:'#9CA3AF', marginBottom:4, letterSpacing:'0.5px', textTransform:'uppercase' }}>Hello</p>
-              <h1 style={{ fontSize:26, fontWeight:700, color:'#fff', marginBottom:6, letterSpacing:'-0.5px' }}>Welcome to Ques-AI</h1>
+              <h1 style={{ fontSize:26, fontWeight:700, color:'#fff', marginBottom:6, letterSpacing:'-0.5px' }}>Welcome to Quesly</h1>
               <p style={{ fontSize:14, color:'#6B7280', marginBottom:24, maxWidth:380 }}>Create AI-powered question papers for your classes in seconds.</p>
               <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
                 <Link href="/create" style={{ textDecoration:'none' }}>
@@ -57,7 +57,7 @@ export default function HomePage() {
           {/* Stats */}
           <div className="stats-grid stagger" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:20 }}>
             {[
-              { label:'Total Assignments', value:assignments.length, icon:BookOpen,   color:'#F97316', bg:'#FFF4EE' },
+              { label:'Total Assignments', value:assignments.length, icon:BookOpen,   color:'#2c5145', bg:'#edf3e8' },
               { label:'Completed',         value:completed,          icon:FileText,   color:'#22C55E', bg:'#F0FDF4' },
               { label:'In Progress',       value:pending,            icon:TrendingUp, color:'#6366F1', bg:'#EEF2FF' },
             ].map(({ label, value, icon:Icon, color, bg }) => (
@@ -82,17 +82,17 @@ export default function HomePage() {
             <h2 style={{ fontSize:14, fontWeight:600, color:'var(--black)', marginBottom:12 }}>Quick Actions</h2>
             <div className="stagger" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(190px,1fr))', gap:10 }}>
               {[
-                { href:'/create',      label:'Create Assignment',    desc:'Generate a new AI paper',    bg:'#F97316', fg:'#fff'     },
+                { href:'/create',      label:'Create Assignment',    desc:'Generate a new AI paper',    bg:'#2c5145', fg:'#fff'     },
                 { href:'/ai-toolkit',  label:"AI Teacher's Toolkit", desc:'Edit & customise papers',    bg:'#fff',    fg:'#1A1A1A'  },
                 { href:'/assignments', label:'View Assignments',      desc:'Browse all assignments',     bg:'#fff',    fg:'#1A1A1A'  },
                 { href:'/library',     label:'My Library',            desc:'Saved templates & papers',   bg:'#fff',    fg:'#1A1A1A'  },
               ].map(({ href, label, desc, bg, fg }) => (
                 <Link key={href} href={href} style={{ textDecoration:'none' }}>
                   <div className="card fade-up" style={{ padding:'16px 18px', cursor:'pointer', background:bg, border: bg==='#fff'?'1px solid var(--border)':'none', transition:'all 0.2s cubic-bezier(0.22,1,0.36,1)' }}
-                    onMouseEnter={e=>{const el=e.currentTarget as HTMLDivElement; el.style.transform='translateY(-3px)'; el.style.boxShadow=bg==='#F97316'?'0 6px 24px rgba(249,115,22,0.35)':'0 6px 20px rgba(0,0,0,0.08)';}}
+                    onMouseEnter={e=>{const el=e.currentTarget as HTMLDivElement; el.style.transform='translateY(-3px)'; el.style.boxShadow=bg==='#2c5145'?'0 6px 24px rgba(44,81,69,0.35)':'0 6px 20px rgba(0,0,0,0.08)';}}
                     onMouseLeave={e=>{const el=e.currentTarget as HTMLDivElement; el.style.transform=''; el.style.boxShadow='';}}>
                     <div style={{ fontSize:13, fontWeight:600, color:fg, marginBottom:4 }}>{label}</div>
-                    <div style={{ fontSize:12, color:bg==='#F97316'?'rgba(255,255,255,0.75)':'#9CA3AF' }}>{desc}</div>
+                    <div style={{ fontSize:12, color:bg==='#2c5145'?'rgba(255,255,255,0.75)':'#9CA3AF' }}>{desc}</div>
                   </div>
                 </Link>
               ))}
@@ -116,7 +116,7 @@ export default function HomePage() {
                     <div style={{ width:36, height:36, borderRadius:9, background:'var(--orange-dim)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'transform 0.2s' }}
                       onMouseEnter={e=>(e.currentTarget.style.transform='scale(1.1) rotate(-5deg)')}
                       onMouseLeave={e=>(e.currentTarget.style.transform='none')}>
-                      <BookOpen size={15} color="#F97316" />
+                      <BookOpen size={15} color="#2c5145" />
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontSize:13, fontWeight:600, color:'var(--black)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:2 }}>{a.title}</div>

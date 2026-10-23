@@ -114,8 +114,8 @@ export const Assignment = {
     const input = stripNul(rawInput);
     const { rows } = await getDb().query(
       `INSERT INTO vedai_assignments (title, subject, due_date, question_types, number_of_questions, total_marks,
-         difficulty, additional_instructions, file_content, client_id, question_plan, owner_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+         difficulty, additional_instructions, file_content, client_id, question_plan, owner_id, institution_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,(SELECT institution_id FROM vedai_memberships WHERE user_id=$12)) RETURNING *`,
       [input.title, input.subject, input.dueDate, input.questionTypes, input.numberOfQuestions, input.totalMarks,
        input.difficulty, input.additionalInstructions ?? null, input.fileContent ?? null, input.clientId ?? null, input.questionPlan ? JSON.stringify(input.questionPlan) : null, ownerId ?? null]
     );

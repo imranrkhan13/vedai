@@ -164,7 +164,7 @@ export default function AssignmentsPage() {
                     </div>
                     {a.status==='processing'&&(
                       <div style={{ marginTop:10 }}>
-                        <div className="progress-bar"><div className="progress-fill" style={{ width:'65%', animation:'shimmer 1.5s infinite', background:'linear-gradient(90deg,#F97316,#FB923C,#F97316)', backgroundSize:'200% 100%' }}/></div>
+                        <div className="progress-bar"><div className="progress-fill" style={{ width:'65%', animation:'shimmer 1.5s infinite', background:'linear-gradient(90deg,#2c5145,#477663,#2c5145)', backgroundSize:'200% 100%' }}/></div>
                         <p style={{ fontSize:11, color:'#6366F1', marginTop:4, display:'flex', alignItems:'center', gap:4 }}><Loader2 size={10} className="spin"/> Generating...</p>
                       </div>
                     )}

@@ -18,7 +18,8 @@ export default function LoginPage() {
     try {
       const r = mode === 'login' ? await api.login(email, password) : await api.register(email, password);
       auth.save(r.user.email);
-      router.replace('/assignments');
+      const next = new URLSearchParams(window.location.search).get('next');
+      router.replace(next && /^\/institution(?:#invite=[a-f0-9]{64})?$/.test(next) ? next : '/assignments');
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Could not sign in');
     } finally { setBusy(false); }
@@ -27,7 +28,7 @@ export default function LoginPage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <form onSubmit={submit} className="card" style={{ width: '100%', maxWidth: 380, padding: 28 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Ques-AI</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Quesly</h1>
         <p style={{ fontSize: 13, color: 'var(--gray-500)', marginBottom: 20 }}>
           {mode === 'login' ? 'Sign in to see your assignments.' : 'Create a free teacher account. Your papers stay private to you.'}
         </p>
@@ -41,7 +42,7 @@ export default function LoginPage() {
         </button>
         <p style={{ fontSize: 12, marginTop: 14, textAlign: 'center', color: 'var(--gray-500)' }}>
           {mode === 'login' ? 'New here? ' : 'Already have an account? '}
-          <a href="#" onClick={e => { e.preventDefault(); setMode(mode === 'login' ? 'register' : 'login'); }} style={{ color: 'var(--orange, #F97316)', fontWeight: 600 }}>
+          <a href="#" onClick={e => { e.preventDefault(); setMode(mode === 'login' ? 'register' : 'login'); }} style={{ color: 'var(--orange, #2c5145)', fontWeight: 600 }}>
             {mode === 'login' ? 'Create an account' : 'Sign in'}
           </a>
         </p>

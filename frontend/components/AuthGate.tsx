@@ -11,7 +11,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (path === '/login' || path === '/student' || path === '/') { setReady(true); return; }
     let live = true;
-    api.me().then((u) => { auth.save(u.email); if (live) setReady(true); }).catch(() => { if (live) router.replace('/login'); });
+    api.me().then((u) => { auth.save(u.email); if (live) setReady(true); }).catch(() => { if (live) router.replace(path === '/institution' ? '/login?next=' + encodeURIComponent('/institution' + window.location.hash) : '/login'); });
     return () => { live = false; };
   }, [path, router]);
   if (!ready && path !== '/login' && path !== '/student' && path !== '/') return null;

@@ -67,7 +67,7 @@ export default function NotificationPanel() {
       <button className="btn btn-ghost btn-sm"
         onClick={() => setOpen(o => !o)}
         style={{ width: 34, height: 34, padding: 0, borderRadius: '50%', position: 'relative' }}>
-        <Bell size={15} color={open ? '#F97316' : '#6B7280'} />
+        <Bell size={15} color={open ? '#2c5145' : '#6B7280'} />
         {unread > 0 && (
           <span style={{ position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: '50%', background: '#EF4444', border: '1.5px solid #fff', display: 'block', animation: 'pulse 2s infinite' }} />
         )}
@@ -81,7 +81,7 @@ export default function NotificationPanel() {
               <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1A1A1A' }}>Notifications</h3>
               {unread > 0 && <p style={{ fontSize: 11, color: '#6B7280', marginTop: 1 }}>{unread} unread</p>}
             </div>
-            <button onClick={markAll} style={{ fontSize: 11, color: '#F97316', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>
+            <button onClick={markAll} style={{ fontSize: 11, color: '#2c5145', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>
               Mark all read
             </button>
           </div>
@@ -112,7 +112,7 @@ export default function NotificationPanel() {
                     onMouseLeave={e => (e.currentTarget.style.color = '#D1D5DB')}>
                     <X size={12} />
                   </button>
-                  {!n.read && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#F97316', flexShrink: 0, marginTop: 5 }} />}
+                  {!n.read && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2c5145', flexShrink: 0, marginTop: 5 }} />}
                 </div>
               );
             })}

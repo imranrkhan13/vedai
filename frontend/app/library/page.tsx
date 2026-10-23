@@ -44,7 +44,7 @@ export default function LibraryPage() {
           {!loading&&completed.length===0&&(
             <div className="card fade-up" style={{ padding:'60px 32px', textAlign:'center' }}>
               <div className="float" style={{ width:56, height:56, background:'var(--orange-dim)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px' }}>
-                <BookOpen size={22} color="#F97316"/>
+                <BookOpen size={22} color="#2c5145"/>
               </div>
               <h2 style={{ fontSize:15, fontWeight:600, color:'var(--black)', marginBottom:6 }}>No saved papers</h2>
               <p style={{ color:'var(--gray-400)', fontSize:13, marginBottom:20 }}>Completed question papers will appear here automatically.</p>
@@ -59,7 +59,7 @@ export default function LibraryPage() {
                   <div style={{ width:38, height:38, borderRadius:9, background:'var(--orange-dim)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'transform 0.2s' }}
                     onMouseEnter={e=>(e.currentTarget.style.transform='scale(1.1) rotate(-5deg)')}
                     onMouseLeave={e=>(e.currentTarget.style.transform='none')}>
-                    <BookOpen size={16} color="#F97316"/>
+                    <BookOpen size={16} color="#2c5145"/>
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <p style={{ fontSize:13, fontWeight:600, color:'var(--black)', marginBottom:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.title}</p>
@@ -71,7 +71,7 @@ export default function LibraryPage() {
                     </button>
                     <button className="btn btn-sm" onClick={()=>router.push('/ai-toolkit')}
                       style={{ background:'var(--orange-dim)', border:'1px solid var(--orange-border)', color:'var(--orange)', fontWeight:600 }}
-                      onMouseEnter={e=>(e.currentTarget.style.background='#FED7AA')}
+                      onMouseEnter={e=>(e.currentTarget.style.background='#cad9c7')}
                       onMouseLeave={e=>(e.currentTarget.style.background='var(--orange-dim)')}>
                       <Pencil size={12}/> Edit
                     </button>

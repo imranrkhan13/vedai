@@ -110,7 +110,7 @@ export default function AIToolkitPage() {
             {!selected&&(
               <div className="card fade-up" style={{ padding:'72px 40px', textAlign:'center', maxWidth:480 }}>
                 <div className="float" style={{ width:64, height:64, background:'var(--orange-dim)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 18px' }}>
-                  <Pencil size={24} color="#F97316"/>
+                  <Pencil size={24} color="#2c5145"/>
                 </div>
                 <h2 style={{ fontSize:17, fontWeight:700, color:'var(--black)', marginBottom:8 }}>AI Teacher&apos;s Toolkit</h2>
                 <p style={{ color:'var(--gray-400)', fontSize:13, lineHeight:1.6, maxWidth:300, margin:'0 auto' }}>
