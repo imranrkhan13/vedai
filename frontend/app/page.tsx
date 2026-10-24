@@ -1,9 +1,13 @@
+import type {Metadata} from 'next';
+import {siteUrl,siteDescription} from '@/lib/seo';
 import Link from 'next/link';
 import Brand from '@/components/Brand';
 import { ArrowRight, ArrowUpRight, BookOpen, Check, FileCheck2, FileText, GraduationCap, LockKeyhole, MessageSquareText, Users, Download, ChevronDown, Clock, ShieldCheck, Layers } from 'lucide-react';
 import AssessmentPreview from '@/components/landing/AssessmentPreview';
 import './landing.css';
 
+export const metadata: Metadata = {alternates:{canonical:'/'},robots:{index:true,follow:true},openGraph:{url:siteUrl,type:'website',siteName:'Quesly',title:'Quesly — More room for teaching',description:siteDescription,images:[{url:'/opengraph-image',width:1200,height:630}]}};
+const structuredData={'@context':'https://schema.org','@graph':[{'@type':'Organization','@id':siteUrl+'/#organization',name:'Quesly',url:siteUrl,logo:siteUrl+'/icon.svg'},{'@type':'WebSite','@id':siteUrl+'/#website',name:'Quesly',url:siteUrl,publisher:{'@id':siteUrl+'/#organization'}},{'@type':'SoftwareApplication',name:'Quesly',url:siteUrl,applicationCategory:'EducationalApplication',operatingSystem:'Web browser',description:siteDescription,featureList:['Question paper drafts from class notes','Teacher-reviewed marking suggestions','Separate student and teacher PDF exports']} ]};
 // Free hosted screenshot of a public page (WordPress mShots). Nothing is stored in this project.
 const shot = (url: string, w = 900, h = 620) => `https://s0.wp.com/mshots/v1/${encodeURIComponent(url)}?w=${w}&h=${h}`;
 
@@ -51,7 +55,7 @@ export default function Landing() {
             <Link className="qx-btn qx-btn-dark qx-btn-sm" href="/waitlist">Join the waitlist <ArrowUpRight size={15} /></Link>
         </header></div>
 
-        <main id="main">
+        <main id="main"><script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(structuredData).replace(/</g,'\\u003c')}}/>
             {/* HERO */}
             <section className="qx-hero qx-wrap">
                 <div className="qx-hero-grid">
@@ -64,7 +68,7 @@ export default function Landing() {
                             <a href="#workflow" className="qx-link">See the whole process <ArrowRight size={16} /></a>
                         </div>
                         <ul className="qx-ticks"><li><Check size={15} />Your teaching material</li><li><Check size={15} />Your final decision</li></ul>
-                        <Link href="/student" className="qx-student">Here to answer an assignment? <b>Student sign in <ArrowUpRight size={13} /></b></Link>
+
                     </div>
                     <div className="qx-hero-visual"><div className="qx-blob" aria-hidden="true" /><div className="qx-preview"><AssessmentPreview /></div></div>
                 </div>
@@ -173,7 +177,7 @@ export default function Landing() {
         <footer className="qx-footer qx-wrap">
             <Link href="/" className="qx-brand"><span className="qx-logo">q.</span>quesly<i>.</i></Link>
             <p>Your notes. Your class. Your call.</p>
-            <div><Link href="/student">Student portal <ArrowUpRight size={14} /></Link><Link href="/waitlist">Join the waitlist <ArrowUpRight size={14} /></Link></div>
+            <div><Link href="/waitlist">Join the waitlist <ArrowUpRight size={14} /></Link></div>
         </footer>
 
         <style>{`

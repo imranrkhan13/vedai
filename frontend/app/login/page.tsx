@@ -56,7 +56,6 @@ export default function LoginPage() {
           <button className="login-submit" type="submit" disabled={busy}>{busy?'Please wait…':mode==='login'?'Sign in':'Create account'}<ArrowRight size={18}/></button>
           <p className="login-switch">Access is by approval. <Link href="/waitlist">Join the waitlist</Link></p>
         </form>
-        <div className="login-student"><GraduationCap size={24}/><div><strong>Here as a student?</strong><p>Use the ID and code your teacher gave you.</p></div><Link href="/student" aria-label="Open student sign in"><ArrowRight size={20}/></Link></div>
         <p className="login-school-note">Invited by your school? Sign in with the email on your invitation, then open your invitation link.</p>
         </div><p className="login-bottom">Thoughtful tools for everyday teaching.</p>
       </section>
